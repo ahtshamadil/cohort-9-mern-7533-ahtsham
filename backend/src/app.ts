@@ -5,6 +5,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { healthRouter } from './routes/health.js';
 
+/** Builds the express app with middleware and routes wired up. */
 export function createApp(): Express {
   const app = express();
 

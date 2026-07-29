@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/** Reads a numeric env variable, using the fallback if unset. Throws if it is not a number. */
 function readNumber(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === '') {
