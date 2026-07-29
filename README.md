@@ -53,11 +53,3 @@ Inside `backend/src`:
 
 app.ts and index.ts are split so tests can use the app without starting a real server.
 
-## Branches
-
-- `main` - production ready code
-- `develop` - development branch
-- `feature/backend/<name>` or `feature/frontend/<name>` - new features
-- `bugfix/backend/<name>` or `bugfix/frontend/<name>` - fixes
-
-All PRs go into `develop`.
