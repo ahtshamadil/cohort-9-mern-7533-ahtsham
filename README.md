@@ -10,6 +10,9 @@ Cohort 9 MERN assignment - a notes app where users can sign up and manage their 
 - Logging: Pino
 - Testing: Mocha + Chai
 
+Note on the database: the assignment is called MERN but the required tools list
+says MySQL, so I went with MySQL.
+
 ## Setup
 
 Needs Node 20 or above.
