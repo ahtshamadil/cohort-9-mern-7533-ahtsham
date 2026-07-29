@@ -1,12 +1,14 @@
-import express from 'express';
+import express, { type Express } from 'express';
+import helmet from 'helmet';
 
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { healthRouter } from './routes/health.js';
 
-export function createApp() {
+export function createApp(): Express {
   const app = express();
 
+  app.use(helmet());
   app.use(requestLogger);
   app.use(express.json());
 

@@ -25,6 +25,15 @@ describe('GET /api/health', () => {
   });
 });
 
+describe('security headers', () => {
+  it('sets the headers added by helmet', async () => {
+    const response = await request(app).get('/api/health');
+
+    expect(response.headers['x-content-type-options']).to.equal('nosniff');
+    expect(response.headers['x-powered-by']).to.equal(undefined);
+  });
+});
+
 describe('unknown routes', () => {
   it('responds with status 404', async () => {
     const response = await request(app).get('/api/this-route-does-not-exist');
