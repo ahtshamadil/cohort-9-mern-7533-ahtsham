@@ -1,0 +1,14 @@
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+[role='alert'] {
+  color: #b3261e;
+}
