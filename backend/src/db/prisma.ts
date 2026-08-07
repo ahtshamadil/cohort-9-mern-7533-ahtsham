@@ -33,12 +33,15 @@ export async function isDatabaseReachable(timeoutMs = 2000): Promise<boolean> {
     timer.unref();
   });
 
-  const probe = prisma.$queryRaw`SELECT 1`;
-  // the probe can still reject after the deadline has already won the race, and
-  // an unwatched rejection would crash the process
-  probe.catch(() => undefined);
-
   try {
+    // built inside the try so that even a synchronous throw from the client
+    // returns false rather than escaping. this function must never reject - the
+    // health route depends on always getting a boolean back.
+    const probe = prisma.$queryRaw`SELECT 1`;
+    // the probe can still reject after the deadline has already won the race,
+    // and an unwatched rejection would crash the process
+    probe.catch(() => undefined);
+
     await Promise.race([probe, deadline]);
     return true;
   } catch {

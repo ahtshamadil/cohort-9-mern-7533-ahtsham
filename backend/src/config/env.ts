@@ -17,9 +17,11 @@ function readNumber(name: string, fallback: number): number {
   return parsed;
 }
 
-/** Reads a required string env variable. Throws if it is missing or empty. */
+/** Reads a required string env variable. Throws if it is missing or blank. */
 function readString(name: string): string {
-  const raw = process.env[name];
+  const raw = process.env[name]?.trim();
+  // a whitespace-only value is a mistake, not a value. catching it here gives a
+  // clear message instead of a confusing failure further along
   if (raw === undefined || raw === '') {
     throw new Error(`Environment variable ${name} is required`);
   }

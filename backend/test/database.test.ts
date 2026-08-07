@@ -43,16 +43,19 @@ describe('database', function () {
       data: { email: 'duplicate@example.com', passwordHash: 'not-a-real-hash' },
     });
 
-    let failed = false;
+    let code: string | undefined;
     try {
       await prisma.user.create({
         data: { email: 'duplicate@example.com', passwordHash: 'not-a-real-hash' },
       });
-    } catch {
-      failed = true;
+    } catch (error) {
+      code = (error as { code?: string }).code;
     }
 
-    expect(failed).to.equal(true);
+    // P2002 is prisma's unique constraint code. checking it rather than just
+    // "something threw" matters - a dropped connection would satisfy the looser
+    // version of this test without the constraint ever being exercised
+    expect(code).to.equal('P2002');
   });
 
   it('links a note to its author', async () => {

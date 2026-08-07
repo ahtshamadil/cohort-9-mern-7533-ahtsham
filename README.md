@@ -15,7 +15,8 @@ says MySQL, so I went with MySQL.
 
 ## Setup
 
-Needs Node 20 or above, and Docker for the database.
+Needs Docker for the database, and Node 20.19+, 22.12+ or 24+ - those are the
+versions Prisma 7 supports, so plain "Node 20" is not enough.
 
 Database first, from the repo root:
 
@@ -29,8 +30,8 @@ Backend:
 
 ```bash
 cd backend
-npm install
 cp .env.example .env
+npm install
 npm run db:migrate
 npm run db:migrate:test
 npm run dev
