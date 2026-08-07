@@ -9,7 +9,9 @@ services:
       MYSQL_ROOT_PASSWORD: notes
       MYSQL_DATABASE: notes
     ports:
-      - '3306:3306'
+      # bound to loopback on purpose. plain '3306:3306' listens on every
+      # interface, which puts this database on any network the machine joins.
+      - '127.0.0.1:3306:3306'
     volumes:
       - mysql-data:/var/lib/mysql
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

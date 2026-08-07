@@ -73,7 +73,7 @@ describe('database', function () {
     expect(notes[0].title).to.equal('First note');
   });
 
-  it('deletes a user notes along with the user', async () => {
+  it("deletes a user's notes along with the user", async () => {
     const user = await prisma.user.create({
       data: { email: 'leaving@example.com', passwordHash: 'not-a-real-hash' },
     });

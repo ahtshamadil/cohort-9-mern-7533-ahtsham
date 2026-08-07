@@ -8,7 +8,13 @@ import { PrismaClient } from '../generated/prisma/client.js';
 // public key, and the driver refuses to do that unless asked. set here rather
 // than in DATABASE_URL so the prisma migrate engine still gets a plain url.
 const connectionUrl = new URL(env.databaseUrl);
-connectionUrl.searchParams.set('allowPublicKeyRetrieval', 'true');
+
+// fetching that key over an unencrypted connection weakens the protection
+// against a man in the middle, so it is limited to local development. a real
+// deployment should connect over TLS, which removes the need for it entirely.
+if (env.nodeEnv !== 'production') {
+  connectionUrl.searchParams.set('allowPublicKeyRetrieval', 'true');
+}
 
 // prisma 7 talks to the database through a driver adapter rather than a url
 // declared in schema.prisma
