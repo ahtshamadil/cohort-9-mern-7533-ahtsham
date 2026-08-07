@@ -17,9 +17,23 @@ function readNumber(name: string, fallback: number): number {
   return parsed;
 }
 
+/** Reads a required string env variable. Throws if it is missing or empty. */
+function readString(name: string): string {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') {
+    throw new Error(`Environment variable ${name} is required`);
+  }
+
+  return raw;
+}
+
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+
 export const env = {
   port: readNumber('PORT', 4000),
-  nodeEnv: process.env.NODE_ENV ?? 'development',
+  nodeEnv,
+  // tests get their own database so a test run never wipes development data
+  databaseUrl: nodeEnv === 'test' ? readString('TEST_DATABASE_URL') : readString('DATABASE_URL'),
 };
 
 export const isDevelopment = env.nodeEnv === 'development';
