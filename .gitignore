@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Prisma client, generated from schema.prisma by `npm run db:generate`
+backend/src/generated/
+
 # Env files - never commit real secrets
 .env
 .env.*

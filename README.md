@@ -6,7 +6,7 @@ Cohort 9 MERN assignment - a notes app where users can sign up and manage their 
 
 - Backend: Node.js, Express, TypeScript
 - Frontend: React + Vite
-- Database: MySQL (coming soon)
+- Database: MySQL with Prisma
 - Logging: Pino
 - Testing: Mocha + Chai (backend), Jest + React Testing Library (frontend)
 
@@ -15,14 +15,25 @@ says MySQL, so I went with MySQL.
 
 ## Setup
 
-Needs Node 20 or above. The two halves run separately, so use two terminals.
+Needs Docker for the database, and Node 20.19+, 22.12+ or 24+ - those are the
+versions Prisma 7 supports, so plain "Node 20" is not enough.
+
+Database first, from the repo root:
+
+```bash
+docker compose up -d
+```
+
+That starts MySQL on port 3306 and creates two databases, `notes` and `notes_test`.
 
 Backend:
 
 ```bash
 cd backend
-npm install
 cp .env.example .env
+npm install
+npm run db:migrate
+npm run db:migrate:test
 npm run dev
 ```
 
@@ -53,6 +64,12 @@ Inside `backend/`:
 - `npm run typecheck` - check for type errors
 - `npm run lint` - check code
 - `npm run format` - format code
+- `npm run db:migrate` - apply migrations to the dev database
+- `npm run db:migrate:test` - same for the test database
+- `npm run db:studio` - browse the data
+
+The database tests skip themselves if MySQL is not running, so `npm test` still
+works without Docker - you just get fewer tests.
 
 Inside `frontend/`:
 

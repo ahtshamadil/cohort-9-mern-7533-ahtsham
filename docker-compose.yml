@@ -1,0 +1,25 @@
+services:
+  mysql:
+    # pinned, because the mysql:8 tag now resolves to 8.4 and the auth plugin
+    # changed with it
+    image: mysql:8.4
+    container_name: notes-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: notes
+      MYSQL_DATABASE: notes
+    ports:
+      # bound to loopback on purpose. plain '3306:3306' listens on every
+      # interface, which puts this database on any network the machine joins.
+      - '127.0.0.1:3306:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-pnotes']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:
