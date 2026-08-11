@@ -1,7 +1,9 @@
 import { expect } from 'chai';
+import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
 import { createApp } from '../src/app.js';
+import { env } from '../src/config/env.js';
 import { isDatabaseReachable, prisma } from '../src/db/prisma.js';
 
 const app = createApp();
@@ -167,6 +169,27 @@ describe('authentication', function () {
       const tampered = `${token.slice(0, -1)}${token.endsWith('a') ? 'b' : 'a'}`;
 
       const response = await request(app).get('/api/auth/me').set('Cookie', `token=${tampered}`);
+
+      expect(response.status).to.equal(401);
+    });
+
+    it('refuses a token signed with an algorithm we do not issue', async () => {
+      const agent = request.agent(app);
+      const registered = await agent.post('/api/auth/register').send(credentials);
+      const { id } = registered.body.user;
+
+      // every HMAC variant uses the same secret, so this token is signed with a
+      // real key and differs only in its header. without the algorithm pinned
+      // it verifies, which lets the sender choose how their token is checked
+      const otherAlgorithm = jwt.sign({}, env.jwtSecret, {
+        algorithm: 'HS512',
+        subject: String(id),
+        expiresIn: 60,
+      });
+
+      const response = await request(app)
+        .get('/api/auth/me')
+        .set('Cookie', `token=${otherAlgorithm}`);
 
       expect(response.status).to.equal(401);
     });
