@@ -29,6 +29,20 @@ function readString(name: string): string {
   return raw;
 }
 
+/**
+ * Reads the token signing key. A short key can be brute forced offline by
+ * anyone holding a token, and the resulting forgery is indistinguishable from a
+ * real login, so the length is enforced at boot rather than trusted.
+ */
+function readSecret(name: string): string {
+  const value = readString(name);
+  if (value.length < 32) {
+    throw new Error(`Environment variable ${name} must be at least 32 characters`);
+  }
+
+  return value;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 export const env = {
@@ -36,6 +50,10 @@ export const env = {
   nodeEnv,
   // tests get their own database so a test run never wipes development data
   databaseUrl: nodeEnv === 'test' ? readString('TEST_DATABASE_URL') : readString('DATABASE_URL'),
+  jwtSecret: readSecret('JWT_SECRET'),
+  // one value in seconds drives both the token's expiry and the cookie's
+  // max-age, so the two can never disagree about when the session ends
+  jwtExpiresInSeconds: readNumber('JWT_EXPIRES_IN_SECONDS', 604800),
 };
 
 export const isDevelopment = env.nodeEnv === 'development';
