@@ -8,6 +8,10 @@ import { ThemeProvider } from '../theme/ThemeProvider';
 export interface StubbedResponse {
   status: number;
   body?: unknown;
+  /** Held back this long before answering, to line up races on purpose. */
+  delayMs?: number;
+  /** Rejects the way fetch does when it cannot reach the server at all. */
+  networkError?: boolean;
 }
 
 /** A user body matching what the auth routes return. */
@@ -38,11 +42,23 @@ export function stubApi(routes: Record<string, StubbedResponse>): void {
       return Promise.reject(new Error(`No stub for ${key}`));
     }
 
-    return Promise.resolve({
+    // fetch rejects rather than resolving when the server cannot be reached,
+    // which is a different path through the callers than any status code
+    if (match.networkError === true) {
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }
+
+    const answer = {
       ok: match.status >= 200 && match.status < 300,
       status: match.status,
       json: () => Promise.resolve(match.body ?? null),
-    } as Response);
+    } as Response;
+
+    if (match.delayMs === undefined) {
+      return Promise.resolve(answer);
+    }
+
+    return new Promise<Response>((resolve) => setTimeout(() => resolve(answer), match.delayMs));
   }) as unknown as typeof fetch;
 }
 
@@ -51,6 +67,7 @@ export function stubApiPending(): void {
   globalThis.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof fetch;
 }
 
+/** Puts the original fetch back, so one test cannot leak into the next. */
 export function restoreFetch(): void {
   globalThis.fetch = originalFetch;
 }
