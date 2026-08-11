@@ -10,7 +10,7 @@ const app = createApp();
 
 const credentials = { email: 'ahtsham@example.com', password: 'correct horse battery' };
 
-/** Registers a user and returns the Set-Cookie header the API replied with. */
+/** Registers a user and returns the whole supertest response. */
 async function register(overrides: Record<string, unknown> = {}) {
   return request(app)
     .post('/api/auth/register')
@@ -127,7 +127,14 @@ describe('authentication', function () {
 
     it('gives the same answer for a wrong password as for an unknown address', async () => {
       // two different messages here would let anyone check which addresses have
-      // accounts, one guess at a time
+      // accounts, one guess at a time.
+      //
+      // matching messages are necessary but not sufficient: how long the two
+      // take has to match as well, which is why authenticateUser compares an
+      // unknown address against a decoy hash. that half is not asserted here -
+      // a timing assertion is only as stable as the machine running it, and one
+      // that fails on a busy CI box teaches people to ignore it. it is checked
+      // by measuring the two routes against a running server instead.
       const wrongPassword = await request(app)
         .post('/api/auth/login')
         .send({ ...credentials, password: 'not the password' });
