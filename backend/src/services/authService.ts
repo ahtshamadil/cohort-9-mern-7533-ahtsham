@@ -62,15 +62,20 @@ export async function registerUser(input: {
 
 // A hash of a password nobody has, compared against when no account matched.
 //
-// Built once on first use rather than written in as a constant, so it is hashed
-// at whatever cost this environment uses and the two branches below stay the
-// same price as that cost changes.
-let decoyHash: Promise<string> | undefined;
+// Hashed here rather than written in as a constant so it costs whatever this
+// environment costs, and the two branches below stay level as that changes.
+//
+// Started at import rather than on first use. Left lazy, the first unknown
+// address after a restart pays to build this on top of the comparison itself,
+// which measured at twice the time of every request after it - a tell of
+// exactly the kind this decoy exists to remove, just rarer. Nothing waits on
+// the promise here; by the time a request arrives it has almost always settled,
+// and if not, awaiting it costs the request that would have built it anyway.
+const decoyHash: Promise<string> = hashPassword('there is no account with this address');
 
-function decoy(): Promise<string> {
-  decoyHash ??= hashPassword('there is no account with this address');
-  return decoyHash;
-}
+// an unhandled rejection would take the process down, and this is only ever
+// awaited inside authenticateUser's try-free path
+decoyHash.catch(() => undefined);
 
 /** Returns the user if the credentials are right, throws 401 if they are not. */
 export async function authenticateUser(email: string, password: string): Promise<PublicUser> {
@@ -90,7 +95,7 @@ export async function authenticateUser(email: string, password: string): Promise
     // plainly visible over a network and enumerates accounts just as well as
     // two different messages would, so this branch buys the same comparison
     // and throws away the answer
-    await verifyPassword(password, await decoy());
+    await verifyPassword(password, await decoyHash);
     throw invalid;
   }
 
