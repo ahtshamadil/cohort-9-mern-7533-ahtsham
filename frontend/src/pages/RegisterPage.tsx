@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { ApiError, byField } from '../api/client';
 import { useAuth } from '../auth/useAuth';
+import { AuthLayout } from './AuthLayout';
 import { FormField } from './FormField';
 
 /** Sign-up screen. Registering also signs you in, so it ends on the dashboard. */
@@ -44,9 +45,16 @@ export function RegisterPage() {
   }
 
   return (
-    <main className="auth-page">
-      <h1>Sign up</h1>
-
+    <AuthLayout
+      eyebrow="Sign up"
+      title="Create your account"
+      subtitle="Somewhere to keep everything worth remembering."
+      footer={
+        <>
+          Already have an account? <Link to="/login">Log in</Link>
+        </>
+      }
+    >
       <form onSubmit={handleSubmit} noValidate>
         {formError !== null && (
           <p className="form-error" role="alert">
@@ -62,6 +70,8 @@ export function RegisterPage() {
           error={fieldErrors.name}
           autoComplete="name"
           required={false}
+          placeholder="Ahtsham"
+          autoFocus
         />
 
         <FormField
@@ -72,6 +82,7 @@ export function RegisterPage() {
           onChange={setEmail}
           error={fieldErrors.email}
           autoComplete="email"
+          placeholder="you@example.com"
         />
 
         <FormField
@@ -82,16 +93,14 @@ export function RegisterPage() {
           onChange={setPassword}
           error={fieldErrors.password}
           autoComplete="new-password"
+          placeholder="At least 8 characters"
         />
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Creating account...' : 'Sign up'}
+        <button type="submit" className="button" disabled={submitting}>
+          {submitting && <span className="spinner" aria-hidden="true" />}
+          Create account
         </button>
       </form>
-
-      <p>
-        Already have an account? <Link to="/login">Log in</Link>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }

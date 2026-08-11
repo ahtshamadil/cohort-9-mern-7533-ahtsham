@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { ApiError, byField } from '../api/client';
 import { useAuth } from '../auth/useAuth';
+import { AuthLayout } from './AuthLayout';
 import { FormField } from './FormField';
 
 /** Log-in screen. Sends people to the dashboard once they are signed in. */
@@ -45,9 +46,16 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <h1>Log in</h1>
-
+    <AuthLayout
+      eyebrow="Log in"
+      title="Welcome back"
+      subtitle="Pick up wherever you left off."
+      footer={
+        <>
+          No account yet? <Link to="/register">Sign up</Link>
+        </>
+      }
+    >
       <form onSubmit={handleSubmit} noValidate>
         {formError !== null && (
           <p className="form-error" role="alert">
@@ -63,6 +71,8 @@ export function LoginPage() {
           onChange={setEmail}
           error={fieldErrors.email}
           autoComplete="email"
+          placeholder="you@example.com"
+          autoFocus
         />
 
         <FormField
@@ -73,16 +83,14 @@ export function LoginPage() {
           onChange={setPassword}
           error={fieldErrors.password}
           autoComplete="current-password"
+          placeholder="Your password"
         />
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Logging in...' : 'Log in'}
+        <button type="submit" className="button" disabled={submitting}>
+          {submitting && <span className="spinner" aria-hidden="true" />}
+          Log in
         </button>
       </form>
-
-      <p>
-        No account yet? <Link to="/register">Sign up</Link>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }
