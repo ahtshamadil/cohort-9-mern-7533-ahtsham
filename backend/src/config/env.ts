@@ -43,6 +43,28 @@ function readSecret(name: string): string {
   return value;
 }
 
+/**
+ * Reads a count of seconds. Rejects anything that is not a whole number above
+ * zero.
+ *
+ * `readNumber` only refuses values that are not numbers at all, so "0", "-1"
+ * and "Infinity" all reach here intact. Each one breaks a session in its own
+ * way - a token that has already expired when it is issued, a cookie the
+ * browser drops on arrival, or an expiry jsonwebtoken cannot encode - and all
+ * three fail at login rather than at boot, which is the wrong place to find out.
+ */
+function readSeconds(name: string, fallback: number): number {
+  const value = readNumber(name, fallback);
+
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(
+      `Environment variable ${name} must be a whole number of seconds above zero, received "${value}"`,
+    );
+  }
+
+  return value;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 export const env = {
@@ -53,7 +75,7 @@ export const env = {
   jwtSecret: readSecret('JWT_SECRET'),
   // one value in seconds drives both the token's expiry and the cookie's
   // max-age, so the two can never disagree about when the session ends
-  jwtExpiresInSeconds: readNumber('JWT_EXPIRES_IN_SECONDS', 604800),
+  jwtExpiresInSeconds: readSeconds('JWT_EXPIRES_IN_SECONDS', 604800),
 };
 
 export const isDevelopment = env.nodeEnv === 'development';
