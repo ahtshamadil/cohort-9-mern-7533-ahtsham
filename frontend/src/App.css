@@ -12,3 +12,70 @@ h1 {
 [role='alert'] {
   color: #b3261e;
 }
+
+/* the sign-in screens are a single column of fields, narrower than a page of
+   notes wants to be */
+.auth-page {
+  max-width: 24rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.field label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.field input {
+  padding: 0.5rem;
+  font: inherit;
+  border: 1px solid #79747e;
+  border-radius: 0.25rem;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: #b3261e;
+}
+
+/* colour alone would not reach anyone who cannot see it, so the message itself
+   carries the meaning and is tied to the input by aria-describedby */
+.field-error,
+.form-error {
+  color: #b3261e;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.form-error {
+  margin-bottom: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #79747e;
+  border-radius: 0.25rem;
+  background: #f7f2fa;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-header h1 {
+  margin-bottom: 0;
+}
