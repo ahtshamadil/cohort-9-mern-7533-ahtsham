@@ -30,6 +30,7 @@ export function DashboardPage() {
 
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,9 +48,19 @@ export function DashboardPage() {
     };
   }, []);
 
+  /** Ends the session and leaves, or reports why it could not. */
   async function handleLogout() {
-    await logout();
-    navigate('/login', { replace: true });
+    setLogoutError(null);
+
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      // the cookie is cleared by the server, so a failed request means the
+      // session is still live. saying so beats navigating away and leaving
+      // someone believing they signed out on a shared machine when they did not
+      setLogoutError('Could not log out. Check your connection and try again.');
+    }
   }
 
   const displayName = user?.name ?? user?.email ?? '';
@@ -71,6 +82,12 @@ export function DashboardPage() {
       </header>
 
       <main className="app-main">
+        {logoutError !== null && (
+          <p className="form-error" role="alert">
+            {logoutError}
+          </p>
+        )}
+
         <div className="page-heading">
           <p className="eyebrow">Your slate</p>
           <h1>Everything worth remembering</h1>
