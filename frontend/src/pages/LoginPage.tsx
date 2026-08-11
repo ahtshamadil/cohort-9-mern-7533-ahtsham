@@ -18,6 +18,7 @@ export function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  /** Signs in, or shows whatever the API objected to. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 

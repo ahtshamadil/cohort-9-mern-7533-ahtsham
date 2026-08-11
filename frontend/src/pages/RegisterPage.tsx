@@ -19,6 +19,7 @@ export function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  /** Creates the account, or shows whatever the API objected to. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
