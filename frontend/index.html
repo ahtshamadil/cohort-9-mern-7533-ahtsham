@@ -14,9 +14,13 @@
       // for itself, so there is one source of truth.
       (function () {
         try {
+          // storage outlives deploys and anything on this origin can write to
+          // it, so the value is checked rather than trusted - an unrecognised
+          // one would sit in the attribute with no stylesheet matching it
           var stored = localStorage.getItem('theme');
+          var known = stored === 'light' || stored === 'dark' ? stored : null;
           var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
+          document.documentElement.dataset.theme = known || (prefersDark ? 'dark' : 'light');
         } catch (error) {
           // private browsing can make localStorage throw on read
           document.documentElement.dataset.theme = 'light';
