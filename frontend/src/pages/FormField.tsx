@@ -77,9 +77,11 @@ export function FormField({
             className="field-reveal"
             onClick={() => setRevealed((shown) => !shown)}
             aria-label={revealed ? 'Hide password' : 'Show password'}
-            // outside the tab order: it is a convenience, and stopping between
-            // the password box and the submit button on every form is not
-            tabIndex={-1}
+            // deliberately left in the tab order. it was out of it, to save a
+            // stop between the password box and submit, but that is a
+            // convenience traded against somebody on a keyboard being unable to
+            // reach the control at all - and checking what you typed matters
+            // most to the people least able to see it
           >
             <svg
               viewBox="0 0 24 24"

@@ -32,6 +32,22 @@ describe('FormField', () => {
     expect(password).toHaveAttribute('type', 'password');
   });
 
+  it('can reach and work the reveal from the keyboard alone', async () => {
+    renderLogin();
+    const user = userEvent.setup();
+
+    const password = await screen.findByLabelText('Password');
+    password.focus();
+
+    // one tab from the password box lands on the reveal. taking it out of the
+    // tab order saved a stop and cost keyboard users the control entirely
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Show password' })).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    expect(password).toHaveAttribute('type', 'text');
+  });
+
   it('offers no reveal on a field that is not a password', async () => {
     renderLogin();
 
