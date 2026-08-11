@@ -15,6 +15,6 @@ describe('App', () => {
     // main.tsx does rather than the routes on their own
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
   });
 });

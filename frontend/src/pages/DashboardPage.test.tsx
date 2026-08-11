@@ -40,6 +40,6 @@ describe('DashboardPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Log out' }));
 
-    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
   });
 });

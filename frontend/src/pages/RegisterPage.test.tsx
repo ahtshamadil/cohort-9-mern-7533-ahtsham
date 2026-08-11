@@ -11,7 +11,7 @@ describe('RegisterPage', () => {
 
     await user.type(await screen.findByLabelText('Email'), 'ahtsham@example.com');
     await user.type(screen.getByLabelText('Password'), 'correct horse battery');
-    await user.click(screen.getByRole('button', { name: 'Sign up' }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
   }
 
   it('creates the account and lands on the dashboard already signed in', async () => {
