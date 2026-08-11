@@ -37,6 +37,13 @@ npm run db:migrate:test
 npm run dev
 ```
 
+Fill in `JWT_SECRET` in `.env` before starting - the server refuses to boot without
+one, and it has to be at least 32 characters. Generate one with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
 Server runs on http://localhost:4000
 
 Check it works: http://localhost:4000/api/health
@@ -54,6 +61,33 @@ App runs on http://localhost:5173
 Both need to be running. The frontend requests `/api/health` from its own origin
 and Vite forwards that to the backend on port 4000, which is why the API needs no
 CORS setup of its own.
+
+## API
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| GET | `/api/health` | Reports that the API is up, and whether the database answers |
+| POST | `/api/auth/register` | Creates an account and signs it in |
+| POST | `/api/auth/login` | Signs an existing account in |
+| POST | `/api/auth/logout` | Signs out |
+| GET | `/api/auth/me` | Returns the signed-in user, 401 if nobody is |
+
+Register takes `email`, `password` and an optional `name`. Passwords need eight
+characters or more, and are stored as a bcrypt hash - never in the clear, and never
+sent back out.
+
+### Sessions
+
+Signing in returns a JSON Web Token in a cookie rather than in the response body.
+The cookie is `httpOnly`, so JavaScript on the page cannot read it and a script
+injected into the app cannot steal the session the way it could out of local
+storage. It is also `SameSite=Lax`, which stops another site posting a form to the
+API and having the browser attach the cookie to it.
+
+The token lasts seven days by default, set by `JWT_EXPIRES_IN_SECONDS`. Logging out
+deletes the cookie. The token itself stays valid until it expires - a JWT cannot be
+recalled once issued, which is the trade for not having to look up a session on
+every request.
 
 ## Scripts
 
@@ -89,9 +123,12 @@ frontend/    the React app
 Inside `backend/src`:
 
 - `config/` - reads env variables
-- `middleware/` - request logging, error handling
+- `db/` - the Prisma client and a reachability probe
+- `middleware/` - request logging, error handling, validation, the auth guard
 - `routes/` - the endpoints
-- `utils/` - logger setup
+- `services/` - the work behind the endpoints, kept out of the route handlers
+- `types/` - extra typings, currently the user id that the auth guard attaches
+- `utils/` - logger, password hashing, tokens, the session cookie
 - `app.ts` - builds the express app
 - `index.ts` - starts the server
 
