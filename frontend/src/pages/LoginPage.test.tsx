@@ -46,6 +46,20 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
   });
 
+  it('falls back to a plain message when the server cannot be reached', async () => {
+    stubApi({
+      'GET /api/auth/me': { status: 401, body: { error: { message: 'Authentication required' } } },
+      // fetch rejects rather than answering, which is a different path than any
+      // status code: there is no envelope to read and no ApiError to build
+      'POST /api/auth/login': { status: 0, networkError: true },
+    });
+
+    renderApp('/login');
+    await logIn();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server');
+  });
+
   it('puts a field error underneath the field it belongs to', async () => {
     stubApi({
       'GET /api/auth/me': { status: 401, body: { error: { message: 'Authentication required' } } },
