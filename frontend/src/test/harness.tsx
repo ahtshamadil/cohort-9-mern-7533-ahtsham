@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { AppRoutes } from '../AppRoutes';
 import { AuthProvider } from '../auth/AuthProvider';
+import { ThemeProvider } from '../theme/ThemeProvider';
 
 export interface StubbedResponse {
   status: number;
@@ -54,13 +55,15 @@ export function restoreFetch(): void {
   globalThis.fetch = originalFetch;
 }
 
-/** Mounts the real routes at a path, inside the router and the auth context. */
+/** Mounts the real routes at a path, inside the router and both contexts. */
 export function renderApp(initialPath = '/') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </MemoryRouter>,
   );
 }
