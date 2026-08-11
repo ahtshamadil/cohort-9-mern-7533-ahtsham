@@ -60,6 +60,18 @@ export async function registerUser(input: {
   }
 }
 
+// A hash of a password nobody has, compared against when no account matched.
+//
+// Built once on first use rather than written in as a constant, so it is hashed
+// at whatever cost this environment uses and the two branches below stay the
+// same price as that cost changes.
+let decoyHash: Promise<string> | undefined;
+
+function decoy(): Promise<string> {
+  decoyHash ??= hashPassword('there is no account with this address');
+  return decoyHash;
+}
+
 /** Returns the user if the credentials are right, throws 401 if they are not. */
 export async function authenticateUser(email: string, password: string): Promise<PublicUser> {
   const user = await prisma.user.findUnique({
@@ -72,6 +84,13 @@ export async function authenticateUser(email: string, password: string): Promise
   const invalid = new HttpError(401, 'Invalid email or password');
 
   if (user === null) {
+    // the message alone is not enough. returning here would answer an unknown
+    // address in about a millisecond and a wrong password in a few hundred,
+    // because only one of the two pays for a bcrypt comparison. that gap is
+    // plainly visible over a network and enumerates accounts just as well as
+    // two different messages would, so this branch buys the same comparison
+    // and throws away the answer
+    await verifyPassword(password, await decoy());
     throw invalid;
   }
 
