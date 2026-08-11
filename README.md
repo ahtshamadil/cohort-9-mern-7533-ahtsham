@@ -100,7 +100,38 @@ app.ts and index.ts are split so tests can use the app without starting a real s
 Inside `frontend/src`:
 
 - `main.tsx` - mounts React onto the page
-- `App.tsx` - the landing page, reports whether the API is reachable
-- `App.test.tsx` - its test, with fetch stubbed
-- `test/` - stub used for css imports during tests
+- `App.tsx` - wraps the routes in the router and the auth context
+- `AppRoutes.tsx` - the routes, kept separate so tests can mount them in a MemoryRouter
+- `api/` - the fetch wrapper and the error type it throws
+- `auth/` - the auth context, its provider, and the route guard
+- `pages/` - one file per screen, plus a shared form field
+- `test/` - the test harness, and a stub used for css imports
+
+## Screens
+
+| Path | Screen | Who can see it |
+| --- | --- | --- |
+| `/login` | Log in | Anyone |
+| `/register` | Sign up | Anyone |
+| `/` | Dashboard | Signed-in users only |
+
+Registering signs you in straight away, so there is no second trip through the
+log-in form.
+
+### How the frontend knows who is signed in
+
+It asks. The session cookie is `httpOnly`, which means JavaScript cannot read it -
+that is the point of it, since a script injected into the page cannot steal a session
+it cannot see. So there is nothing in the browser to inspect, and the only way to
+find out is to call `GET /api/auth/me` when the app starts.
+
+That call has three outcomes, and the guard treats them differently:
+
+- **still waiting** - render nothing. Treating "not known yet" as "signed out" would
+  bounce a signed-in user to the log-in page for a moment on every refresh
+- **200** - signed in, show the dashboard
+- **401** - not signed in, redirect to `/login`
+
+Nothing is kept in local storage. Logging out clears the cookie server-side, so a
+reload after it cannot get back in.
 
