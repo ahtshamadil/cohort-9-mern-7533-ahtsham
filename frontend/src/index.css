@@ -1,111 +1,189 @@
+/* ---------------------------------------------------------------------------
+   Slate.
+
+   The name is the design brief: a slate is a stone surface you write on. So the
+   system is cool stone with one warm mark on it - chalk-grey and slate-blue for
+   every surface, marigold for anything that wants attention. That cool/warm
+   tension is the whole identity, and it is why nothing here needs a gradient.
+
+   Buttons are ink: near-black on the light theme, chalk-white on the dark one.
+   Inverting them rather than colouring them is what keeps the marigold rare
+   enough to still mean something.
+   --------------------------------------------------------------------------- */
+
+:root[data-theme='light'],
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --surface: #f2f2ef;
+  --surface-raised: #fafaf8;
+  --surface-sunken: #e9e9e5;
+  --surface-hover: #e4e4df;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --rule: #dedeD7;
+  --rule-strong: #c4c4bb;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  --ink: #1b1f22;
+  --ink-muted: #5b6469;
+  --ink-subtle: #8b9298;
+
+  /* the ink button and its inverse */
+  --ink-fill: #1b1f22;
+  --ink-fill-hover: #2b3237;
+  --ink-fill-text: #fafaf8;
+
+  --accent: #a8711a;
+  --accent-hover: #8c5c12;
+  --marker: rgb(226 168 45 / 42%);
+
+  --danger: #a83228;
+  --danger-soft: rgb(168 50 40 / 7%);
+  --success: #2f7d4f;
+
+  --shadow-sm: 0 1px 2px rgb(27 31 34 / 7%);
+  --shadow-md: 0 6px 20px -6px rgb(27 31 34 / 13%), 0 1px 3px rgb(27 31 34 / 6%);
+  --shadow-lg: 0 28px 56px -20px rgb(27 31 34 / 20%), 0 2px 8px rgb(27 31 34 / 7%);
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --surface: #14181b;
+  --surface-raised: #1c2125;
+  --surface-sunken: #101315;
+  --surface-hover: #262c31;
+
+  --rule: #2a3136;
+  --rule-strong: #3c454b;
+
+  --ink: #eceef0;
+  --ink-muted: #98a2a8;
+  --ink-subtle: #6b757b;
+
+  --ink-fill: #eceef0;
+  --ink-fill-hover: #ffffff;
+  --ink-fill-text: #14181b;
+
+  --accent: #e5a93f;
+  --accent-hover: #f0bb5e;
+  --marker: rgb(229 169 63 / 30%);
+
+  --danger: #f28b82;
+  --danger-soft: rgb(242 139 130 / 12%);
+  --success: #6cc48d;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 55%), 0 1px 3px rgb(0 0 0 / 35%);
+  --shadow-lg: 0 28px 56px -20px rgb(0 0 0 / 70%), 0 2px 8px rgb(0 0 0 / 45%);
+
+  color-scheme: dark;
+}
+
+:root {
+  /* corners stay tight. a slate has edges, not pills */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-full: 999px;
+
+  /* a real serif for anything that speaks, a plain sans for controls, a mono
+     for the small print. all three ship with the OS, so nothing waits on a font
+     server or falls apart offline */
+  --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, ui-serif, serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100svh;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+#root {
+  min-height: 100svh;
 }
 
 h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  line-height: 1.15;
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: 2.25rem;
 }
+
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  font-size: 1.375rem;
 }
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+/* links get a chalk swipe rather than an underline. it sits behind the text and
+   grows on hover - the one flourish in the whole system */
+a {
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: none;
+  background-image: linear-gradient(var(--marker), var(--marker));
+  background-repeat: no-repeat;
+  background-position: 0 88%;
+  background-size: 100% 0.35em;
+  transition: background-size 0.25s var(--ease);
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+a:hover {
+  background-size: 100% 0.95em;
+}
+
+/* no border-radius here. it would round the element rather than the outline,
+   which is not the same thing - browsers already follow whatever radius the
+   element has when they draw one */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* held for one frame while the theme swaps. see ThemeProvider for why - without
+   it a transitioned property keeps the colour it resolved under the old theme */
+:root[data-switching] *,
+:root[data-switching] *::before,
+:root[data-switching] *::after {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

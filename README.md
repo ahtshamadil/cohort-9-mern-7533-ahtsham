@@ -100,7 +100,58 @@ app.ts and index.ts are split so tests can use the app without starting a real s
 Inside `frontend/src`:
 
 - `main.tsx` - mounts React onto the page
-- `App.tsx` - the landing page, reports whether the API is reachable
-- `App.test.tsx` - its test, with fetch stubbed
-- `test/` - stub used for css imports during tests
+- `App.tsx` - wraps the routes in the router and the auth context
+- `AppRoutes.tsx` - the routes, kept separate so tests can mount them in a MemoryRouter
+- `api/` - the fetch wrapper and the error type it throws
+- `auth/` - the auth context, its provider, and the route guard
+- `pages/` - one file per screen, plus a shared form field
+- `test/` - the test harness, and a stub used for css imports
+
+## Screens
+
+| Path | Screen | Who can see it |
+| --- | --- | --- |
+| `/login` | Log in | Anyone |
+| `/register` | Sign up | Anyone |
+| `/` | Dashboard | Signed-in users only |
+
+Registering signs you in straight away, so there is no second trip through the
+log-in form.
+
+### How the frontend knows who is signed in
+
+It asks. The session cookie is `httpOnly`, which means JavaScript cannot read it -
+that is the point of it, since a script injected into the page cannot steal a session
+it cannot see. So there is nothing in the browser to inspect, and the only way to
+find out is to call `GET /api/auth/me` when the app starts.
+
+That call has three outcomes, and the guard treats them differently:
+
+- **still waiting** - render nothing. Treating "not known yet" as "signed out" would
+  bounce a signed-in user to the log-in page for a moment on every refresh
+- **200** - signed in, show the dashboard
+- **401** - not signed in, redirect to `/login`
+
+No session data is kept in local storage - the only thing stored there is the chosen
+theme, which is a display preference and worth nothing to anybody. Logging out clears
+the cookie server-side, so a reload after it cannot get back in.
+
+## Look and feel
+
+The app is called **Slate**, and the name is the design brief: a slate is a stone
+surface you write on. So the interface is cool stone with one warm mark on it -
+chalk-grey and slate-blue for every surface, marigold for anything asking for
+attention. Buttons are ink rather than a colour, inverting between the themes, which
+is what keeps the marigold rare enough to still mean something.
+
+Both themes are first-class. A small script in `index.html` applies the stored choice
+before the first paint, so the page is never drawn in the wrong theme and corrected a
+moment later. React reads that attribute rather than deciding again, so there is one
+source of truth. Transitions are suspended for the frame in which the theme changes -
+otherwise every surface cross-fades at once, and a property caught mid-transition
+keeps the colour it resolved under the old theme.
+
+Type is a system serif for anything that speaks, the system sans for controls, and a
+monospace for small print. None of them are downloaded, so the app looks the same
+offline and never waits on a font server.
 

@@ -1,14 +1,526 @@
-main {
-  max-width: 40rem;
+/* ---------- shared ---------- */
+
+.muted {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+}
+
+/* ---------- wordmark ---------- */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--ink);
+}
+
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  color: var(--ink-fill-text);
+  background-color: var(--ink-fill);
+}
+
+/* the one dab of marigold in the mark, so the logo carries the accent colour
+   even where nothing else on screen does */
+.logo-mark-dot {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.logo-text {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.logo-lg .logo-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.logo-lg .logo-text {
+  font-size: 1.5rem;
+}
+
+/* ---------- buttons ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-weight: 550;
+  color: var(--ink-fill-text);
+  background-color: var(--ink-fill);
+  border: 1px solid var(--ink-fill);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--ink-fill-hover);
+  border-color: var(--ink-fill-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* a ring that spins rather than a word that changes, so the button keeps its
+   width and the label does not jump while a request is in flight */
+.spinner {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  border: 2px solid currentcolor;
+  border-top-color: transparent;
+  border-radius: var(--radius-full);
+  opacity: 0.85;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button-ghost {
+  width: auto;
+  color: var(--ink-muted);
+  background-color: transparent;
+  border-color: var(--rule-strong);
+}
+
+.button-ghost:hover:not(:disabled) {
+  color: var(--ink);
+  background-color: var(--surface-hover);
+  border-color: var(--rule-strong);
+  box-shadow: none;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--ink-muted);
+  background-color: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    color 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+
+.icon-button:hover {
+  color: var(--accent);
+  background-color: var(--surface-hover);
+}
+
+.theme-icon {
+  transition: transform 0.4s var(--ease);
+}
+
+.icon-button:hover .theme-icon {
+  transform: rotate(25deg);
+}
+
+/* ---------- the sign-in screens ---------- */
+
+.auth-shell {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100svh;
+}
+
+/* the slate itself: a ruled stone panel that carries the branding */
+.auth-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 3rem;
+  overflow: hidden;
+  color: var(--ink);
+  background-color: var(--surface-sunken);
+  border-right: 1px solid var(--rule);
+}
+
+/* ruled lines, drawn as a gradient rather than shipped as an image */
+.auth-rules {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(2rem - 1px),
+    var(--rule) calc(2rem - 1px),
+    var(--rule) 2rem
+  );
+  /* fade the ruling out at the edges so it reads as texture, not as a table */
+  mask-image: radial-gradient(120% 90% at 30% 40%, #000 35%, transparent 78%);
+  opacity: 0.75;
+}
+
+/* the red margin rule from a school exercise book */
+.auth-margin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.25rem;
+  width: 1px;
+  background-color: var(--accent);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.auth-aside-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* the auto margins centre the line in whatever space the wordmark leaves, so
+   the panel never opens with a void between the two */
+.auth-quote {
+  position: relative;
+  z-index: 1;
+  max-width: 20rem;
+  margin: auto 0;
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 2.6vw, 2.375rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* an oversized opening quote, set in the margin so the text stays flush left */
+.auth-quote::before {
+  content: '\201C';
+  position: absolute;
+  top: -0.35em;
+  left: -0.42em;
+  font-size: 3.25em;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.auth-panel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 3rem 1.5rem;
+  background-color: var(--surface-raised);
+}
+
+.auth-toolbar {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+}
+
+.auth-form {
+  width: 100%;
+  max-width: 22rem;
+  animation: rise 0.5s var(--ease) both;
+}
+
+/* the form settles into place once. small enough to feel like the page arriving
+   rather than an animation being performed at you */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+  }
+}
+
+.auth-heading {
+  margin-bottom: 2rem;
+}
+
+.auth-heading h1 {
+  margin: 0.375rem 0 0.5rem;
+}
+
+.auth-footer {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+}
+
+/* the branding moves inline above the form once the slate panel is gone */
+.auth-panel .logo {
+  display: none;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 60rem) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-aside {
+    display: none;
+  }
+
+  .auth-panel .logo {
+    display: inline-flex;
+  }
+}
+
+/* ---------- forms ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1.125rem;
+}
+
+.field label {
+  font-size: 0.8125rem;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  color: var(--ink-muted);
+  transition: color 0.15s var(--ease);
+}
+
+/* the label picks up the accent while its field has focus, so the eye is told
+   where it is without anything moving */
+.field:focus-within label {
+  color: var(--accent);
+}
+
+.field-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  font: inherit;
+  color: var(--ink);
+  background-color: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  transition:
+    border-color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+
+/* room for the reveal button, so the text never runs underneath it */
+.field input.has-affix {
+  padding-right: 2.75rem;
+}
+
+.field-reveal {
+  position: absolute;
+  right: 0.375rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--ink-subtle);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+
+.field-reveal:hover {
+  color: var(--ink);
+}
+
+.field-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.field-hint::before {
+  content: '';
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: var(--radius-full);
+  background-color: currentcolor;
+}
+
+.field input::placeholder {
+  color: var(--ink-subtle);
+}
+
+.field input:focus {
+  outline: none;
+  background-color: var(--surface-raised);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--marker);
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* colour alone would not reach anyone who cannot see it, so the message carries
+   the meaning and aria-describedby ties it to the input */
+.field-error {
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+
+.form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.6875rem 0.8125rem;
+  font-size: 0.875rem;
+  color: var(--danger);
+  background-color: var(--danger-soft);
+  /* a rule down the side rather than a box, the way a correction is marked */
+  border-left: 2px solid var(--danger);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ---------- the app shell, once signed in ---------- */
+
+.app-shell {
+  min-height: 100svh;
+  background-color: var(--surface);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  background-color: var(--surface-raised);
+  border-bottom: 1px solid var(--rule);
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-main {
+  max-width: 58rem;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 3rem 1.5rem;
 }
 
-h1 {
-  font-size: 2rem;
-  margin-bottom: 1rem;
+.page-heading {
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--rule);
 }
 
-[role='alert'] {
-  color: #b3261e;
+.page-heading h1 {
+  margin: 0.375rem 0 0.375rem;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-family: var(--display);
+  font-size: 0.9375rem;
+  color: var(--ink-fill-text);
+  background-color: var(--ink-fill);
+  border-radius: var(--radius-md);
+  user-select: none;
+}
+
+.empty-state {
+  position: relative;
+  padding: 4rem 1.5rem;
+  overflow: hidden;
+  text-align: center;
+  color: var(--ink-muted);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+}
+
+.empty-state h2 {
+  margin-bottom: 0.375rem;
+  color: var(--ink);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-subtle);
+}
+
+.status-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: var(--radius-full);
+  background-color: var(--ink-subtle);
+}
+
+.status-dot-ok {
+  background-color: var(--success);
+}
+
+.status-dot-down {
+  background-color: var(--danger);
+}
+
+@media (max-width: 40rem) {
+  .app-main {
+    padding: 2rem 1rem;
+  }
+
+  h1 {
+    font-size: 1.875rem;
+  }
 }

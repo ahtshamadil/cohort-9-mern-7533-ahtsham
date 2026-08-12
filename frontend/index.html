@@ -4,7 +4,29 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Notes</title>
+    <meta name="theme-color" content="#f2f2ef" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14181b" media="(prefers-color-scheme: dark)" />
+    <title>Slate</title>
+    <script>
+      // runs before the first paint, so the page is never drawn in the wrong
+      // theme and then corrected - that flash is the usual giveaway that a dark
+      // mode was bolted on. react picks this attribute up rather than deciding
+      // for itself, so there is one source of truth.
+      (function () {
+        try {
+          // storage outlives deploys and anything on this origin can write to
+          // it, so the value is checked rather than trusted - an unrecognised
+          // one would sit in the attribute with no stylesheet matching it
+          var stored = localStorage.getItem('theme');
+          var known = stored === 'light' || stored === 'dark' ? stored : null;
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = known || (prefersDark ? 'dark' : 'light');
+        } catch (error) {
+          // private browsing can make localStorage throw on read
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
