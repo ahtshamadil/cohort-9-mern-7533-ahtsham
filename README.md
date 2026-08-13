@@ -37,6 +37,13 @@ npm run db:migrate:test
 npm run dev
 ```
 
+Fill in `JWT_SECRET` in `.env` before starting - the server refuses to boot without
+one, and it has to be at least 32 characters. Generate one with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
 Server runs on http://localhost:4000
 
 Check it works: http://localhost:4000/api/health
@@ -54,6 +61,60 @@ App runs on http://localhost:5173
 Both need to be running. The frontend requests `/api/health` from its own origin
 and Vite forwards that to the backend on port 4000, which is why the API needs no
 CORS setup of its own.
+
+## API
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| GET | `/api/health` | Reports that the API is up, and whether the database answers |
+| POST | `/api/auth/register` | Creates an account and signs it in |
+| POST | `/api/auth/login` | Signs an existing account in |
+| POST | `/api/auth/logout` | Signs out |
+| GET | `/api/auth/me` | Returns the signed-in user, 401 if nobody is |
+
+Register takes `email`, `password` and an optional `name`. Passwords need 8 characters
+or more. They get hashed with bcrypt before saving and never come back in a response.
+
+### Sessions
+
+When you log in the token goes into a cookie, not into the response body. The cookie
+is `httpOnly`, so JavaScript can't read its value and a script injected into the page
+can't copy the token out and use it somewhere else. If the token sat in local storage
+it could.
+
+That's worth being clear about though - it doesn't make XSS harmless. A script running
+on the page can still call the API, because the browser attaches the cookie to
+same-origin requests on its own. So `httpOnly` stops the token being taken away, not
+an injected script acting as you while it runs.
+
+It is also `SameSite=Lax`, so another site can't post a form to the API and have the
+browser attach the cookie to it.
+
+The token lasts 7 days, set by `JWT_EXPIRES_IN_SECONDS`. The cookie's max-age uses the
+same value so the two expire together. Logging out clears the cookie, but the token
+itself stays valid until it runs out - you can't cancel a JWT once it's issued. That's
+the trade-off for not having to look up a session on every request.
+
+### A few things worth knowing
+
+Duplicate emails are caught from the database's unique constraint (Prisma gives error
+`P2002`) rather than checking first with a `findUnique`. Checking first has a race in
+it, where two signups can both see the same address as free.
+
+Login takes the same amount of time whether the email exists or not. If it returned
+straight away for an unknown email that would be fast, while a wrong password is slow
+because of bcrypt. Someone could use that difference to work out which emails have
+accounts, even though the message is the same either way. So when there's no account,
+the password gets compared against a dummy hash instead.
+
+Emails are lowercased and trimmed on the way in, so `Ahtsham@x.com` and
+`ahtsham@x.com` are the same account.
+
+The JWT algorithm is set to HS256 for both signing and verifying. Without that, the
+token's own header gets to decide how it's checked.
+
+`JWT_SECRET` has to be at least 32 characters and the server won't start without one.
+A short key can be brute-forced offline by anyone holding a token.
 
 ## Scripts
 
@@ -89,9 +150,12 @@ frontend/    the React app
 Inside `backend/src`:
 
 - `config/` - reads env variables
-- `middleware/` - request logging, error handling
+- `db/` - the Prisma client and a reachability probe
+- `middleware/` - request logging, error handling, validation, the auth guard
 - `routes/` - the endpoints
-- `utils/` - logger setup
+- `services/` - the work behind the endpoints, kept out of the route handlers
+- `types/` - extra typings, currently the user id that the auth guard attaches
+- `utils/` - logger, password hashing, tokens, the session cookie
 - `app.ts` - builds the express app
 - `index.ts` - starts the server
 

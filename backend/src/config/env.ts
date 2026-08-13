@@ -29,6 +29,29 @@ function readString(name: string): string {
   return raw;
 }
 
+/** Reads the token signing key. Rejects one short enough to be brute forced. */
+function readSecret(name: string): string {
+  const value = readString(name);
+  if (value.length < 32) {
+    throw new Error(`Environment variable ${name} must be at least 32 characters`);
+  }
+
+  return value;
+}
+
+/** Reads a count of seconds. Rejects zero, negatives and Infinity. */
+function readSeconds(name: string, fallback: number): number {
+  const value = readNumber(name, fallback);
+
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(
+      `Environment variable ${name} must be a whole number of seconds above zero, received "${value}"`,
+    );
+  }
+
+  return value;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 export const env = {
@@ -36,6 +59,9 @@ export const env = {
   nodeEnv,
   // tests get their own database so a test run never wipes development data
   databaseUrl: nodeEnv === 'test' ? readString('TEST_DATABASE_URL') : readString('DATABASE_URL'),
+  jwtSecret: readSecret('JWT_SECRET'),
+  // used for both the token expiry and the cookie max-age, so they always match
+  jwtExpiresInSeconds: readSeconds('JWT_EXPIRES_IN_SECONDS', 604800),
 };
 
 export const isDevelopment = env.nodeEnv === 'development';
