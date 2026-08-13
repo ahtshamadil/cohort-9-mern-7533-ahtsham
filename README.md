@@ -72,22 +72,43 @@ CORS setup of its own.
 | POST | `/api/auth/logout` | Signs out |
 | GET | `/api/auth/me` | Returns the signed-in user, 401 if nobody is |
 
-Register takes `email`, `password` and an optional `name`. Passwords need eight
-characters or more, and are stored as a bcrypt hash - never in the clear, and never
-sent back out.
+Register takes `email`, `password` and an optional `name`. Passwords need 8 characters
+or more. They get hashed with bcrypt before saving and never come back in a response.
 
 ### Sessions
 
-Signing in returns a JSON Web Token in a cookie rather than in the response body.
-The cookie is `httpOnly`, so JavaScript on the page cannot read it and a script
-injected into the app cannot steal the session the way it could out of local
-storage. It is also `SameSite=Lax`, which stops another site posting a form to the
-API and having the browser attach the cookie to it.
+When you log in the token goes into a cookie, not into the response body. The cookie
+is `httpOnly` so JavaScript can't read it, which means a script injected into the page
+can't steal your session. If the token was sitting in local storage it could.
 
-The token lasts seven days by default, set by `JWT_EXPIRES_IN_SECONDS`. Logging out
-deletes the cookie. The token itself stays valid until it expires - a JWT cannot be
-recalled once issued, which is the trade for not having to look up a session on
-every request.
+It is also `SameSite=Lax`, so another site can't post a form to the API and have the
+browser attach the cookie to it.
+
+The token lasts 7 days, set by `JWT_EXPIRES_IN_SECONDS`. The cookie's max-age uses the
+same value so the two expire together. Logging out clears the cookie, but the token
+itself stays valid until it runs out - you can't cancel a JWT once it's issued. That's
+the trade-off for not having to look up a session on every request.
+
+### A few things worth knowing
+
+Duplicate emails are caught from the database's unique constraint (Prisma gives error
+`P2002`) rather than checking first with a `findUnique`. Checking first has a race in
+it, where two signups can both see the same address as free.
+
+Login takes the same amount of time whether the email exists or not. If it returned
+straight away for an unknown email that would be fast, while a wrong password is slow
+because of bcrypt. Someone could use that difference to work out which emails have
+accounts, even though the message is the same either way. So when there's no account,
+the password gets compared against a dummy hash instead.
+
+Emails are lowercased and trimmed on the way in, so `Ahtsham@x.com` and
+`ahtsham@x.com` are the same account.
+
+The JWT algorithm is set to HS256 for both signing and verifying. Without that, the
+token's own header gets to decide how it's checked.
+
+`JWT_SECRET` has to be at least 32 characters and the server won't start without one.
+A short key can be brute forced offline by anyone holding a token.
 
 ## Scripts
 
