@@ -78,8 +78,14 @@ or more. They get hashed with bcrypt before saving and never come back in a resp
 ### Sessions
 
 When you log in the token goes into a cookie, not into the response body. The cookie
-is `httpOnly` so JavaScript can't read it, which means a script injected into the page
-can't steal your session. If the token was sitting in local storage it could.
+is `httpOnly`, so JavaScript can't read its value and a script injected into the page
+can't copy the token out and use it somewhere else. If the token sat in local storage
+it could.
+
+That's worth being clear about though - it doesn't make XSS harmless. A script running
+on the page can still call the API, because the browser attaches the cookie to
+same-origin requests on its own. So `httpOnly` stops the token being taken away, not
+an injected script acting as you while it runs.
 
 It is also `SameSite=Lax`, so another site can't post a form to the API and have the
 browser attach the cookie to it.
@@ -108,7 +114,7 @@ The JWT algorithm is set to HS256 for both signing and verifying. Without that, 
 token's own header gets to decide how it's checked.
 
 `JWT_SECRET` has to be at least 32 characters and the server won't start without one.
-A short key can be brute forced offline by anyone holding a token.
+A short key can be brute-forced offline by anyone holding a token.
 
 ## Scripts
 
