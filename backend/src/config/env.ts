@@ -29,11 +29,7 @@ function readString(name: string): string {
   return raw;
 }
 
-/**
- * Reads the token signing key. A short key can be brute forced offline by
- * anyone holding a token, and the resulting forgery is indistinguishable from a
- * real login, so the length is enforced at boot rather than trusted.
- */
+/** Reads the token signing key. Rejects one short enough to be brute forced. */
 function readSecret(name: string): string {
   const value = readString(name);
   if (value.length < 32) {
@@ -43,16 +39,7 @@ function readSecret(name: string): string {
   return value;
 }
 
-/**
- * Reads a count of seconds. Rejects anything that is not a whole number above
- * zero.
- *
- * `readNumber` only refuses values that are not numbers at all, so "0", "-1"
- * and "Infinity" all reach here intact. Each one breaks a session in its own
- * way - a token that has already expired when it is issued, a cookie the
- * browser drops on arrival, or an expiry jsonwebtoken cannot encode - and all
- * three fail at login rather than at boot, which is the wrong place to find out.
- */
+/** Reads a count of seconds. Rejects zero, negatives and Infinity. */
 function readSeconds(name: string, fallback: number): number {
   const value = readNumber(name, fallback);
 
@@ -73,8 +60,7 @@ export const env = {
   // tests get their own database so a test run never wipes development data
   databaseUrl: nodeEnv === 'test' ? readString('TEST_DATABASE_URL') : readString('DATABASE_URL'),
   jwtSecret: readSecret('JWT_SECRET'),
-  // one value in seconds drives both the token's expiry and the cookie's
-  // max-age, so the two can never disagree about when the session ends
+  // used for both the token expiry and the cookie max-age, so they always match
   jwtExpiresInSeconds: readSeconds('JWT_EXPIRES_IN_SECONDS', 604800),
 };
 

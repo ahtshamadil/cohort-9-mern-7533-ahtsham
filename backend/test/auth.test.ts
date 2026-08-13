@@ -21,8 +21,7 @@ after(async () => {
   await prisma.$disconnect();
 });
 
-// these need the real notes_test database from docker compose. without it they
-// skip rather than fail, so the suite still runs on a machine without docker
+// skipped rather than failed when the database is not running
 describe('authentication', function () {
   before(async function () {
     if (!(await isDatabaseReachable())) {
@@ -61,7 +60,7 @@ describe('authentication', function () {
       const stored = await prisma.user.findUnique({ where: { email: credentials.email } });
 
       expect(stored?.passwordHash).to.not.equal(credentials.password);
-      // bcrypt hashes are 60 characters and start with the cost-bearing prefix
+      // bcrypt hashes start with this prefix
       expect(stored?.passwordHash).to.match(/^\$2[aby]\$/);
     });
 
@@ -126,15 +125,6 @@ describe('authentication', function () {
     });
 
     it('gives the same answer for a wrong password as for an unknown address', async () => {
-      // two different messages here would let anyone check which addresses have
-      // accounts, one guess at a time.
-      //
-      // matching messages are necessary but not sufficient: how long the two
-      // take has to match as well, which is why authenticateUser compares an
-      // unknown address against a decoy hash. that half is not asserted here -
-      // a timing assertion is only as stable as the machine running it, and one
-      // that fails on a busy CI box teaches people to ignore it. it is checked
-      // by measuring the two routes against a running server instead.
       const wrongPassword = await request(app)
         .post('/api/auth/login')
         .send({ ...credentials, password: 'not the password' });
@@ -149,8 +139,7 @@ describe('authentication', function () {
 
   describe('GET /api/auth/me', () => {
     it('returns the signed-in user', async () => {
-      // an agent keeps the cookie from one request to the next, the way a
-      // browser would
+      // an agent keeps the cookie between requests
       const agent = request.agent(app);
       await agent.post('/api/auth/register').send(credentials);
 
@@ -171,8 +160,7 @@ describe('authentication', function () {
       const registered = await agent.post('/api/auth/register').send(credentials);
 
       const token = /token=([^;]+)/.exec(registered.headers['set-cookie'][0])?.[1] ?? '';
-      // flipping the last character breaks the signature without changing the
-      // shape of the token, so it fails verification rather than parsing
+      // changing the last character breaks the signature
       const tampered = `${token.slice(0, -1)}${token.endsWith('a') ? 'b' : 'a'}`;
 
       const response = await request(app).get('/api/auth/me').set('Cookie', `token=${tampered}`);
@@ -185,9 +173,7 @@ describe('authentication', function () {
       const registered = await agent.post('/api/auth/register').send(credentials);
       const { id } = registered.body.user;
 
-      // every HMAC variant uses the same secret, so this token is signed with a
-      // real key and differs only in its header. without the algorithm pinned
-      // it verifies, which lets the sender choose how their token is checked
+      // signed with the real secret, only the algorithm differs
       const otherAlgorithm = jwt.sign({}, env.jwtSecret, {
         algorithm: 'HS512',
         subject: String(id),
@@ -232,8 +218,7 @@ describe('authentication', function () {
       const loggedIn = await agent.post('/api/auth/login').send(credentials);
       const me = await agent.get('/api/auth/me');
 
-      // checking the whole serialised body rather than one field, so a hash
-      // reached by any path at all is still caught
+      // check the whole body, not just one field
       for (const response of [registered, loggedIn, me]) {
         expect(JSON.stringify(response.body)).to.not.include('passwordHash');
         expect(JSON.stringify(response.body)).to.not.include('$2b$');

@@ -10,19 +10,11 @@ export function notFoundHandler(req: Request, res: Response): void {
   });
 }
 
-/**
- * Turns a thrown error into a response.
- *
- * An HttpError is something a route meant to return - a bad request, a failed
- * login - so its message is written for the client and goes back as it is.
- * Anything else is a fault nobody planned for, and its message could name a
- * table or a file path, so it is logged in full and answered with a generic 500.
- */
+/** Turns an error into a response. */
 // express only treats this as an error handler if it has all 4 params
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
+  // an HttpError is one a route meant to return, so its message is safe to send
   if (err instanceof HttpError && err.statusCode < 500) {
-    // debug, not error: a rejected login is the API working, not breaking, and
-    // logging it at error level would bury the failures that do need attention
     logger.debug(
       { statusCode: err.statusCode, method: req.method, url: req.originalUrl },
       err.message,
