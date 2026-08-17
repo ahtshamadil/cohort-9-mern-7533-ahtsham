@@ -23,3 +23,12 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   req.userId = userId;
   next();
 }
+
+/** The id requireAuth put on the request. */
+export function currentUserId(req: Request): number {
+  if (req.userId === undefined) {
+    throw new HttpError(401, 'Authentication required');
+  }
+
+  return req.userId;
+}
