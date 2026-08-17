@@ -40,6 +40,11 @@ const updateSchema = z
     'Give a title or content to change',
   );
 
+// express types req.body as any, so binding it to the schema's type is what makes
+// the compiler check these calls against the service
+type CreateBody = z.infer<typeof createSchema>;
+type UpdateBody = z.infer<typeof updateSchema>;
+
 function noteId(value: string | string[]): number {
   const id = typeof value === 'string' ? Number(value) : NaN;
 
@@ -57,7 +62,8 @@ notesRouter.get('/', async (req, res) => {
 });
 
 notesRouter.post('/', validateBody(createSchema), async (req, res) => {
-  const note = await createNote(currentUserId(req), req.body);
+  const body: CreateBody = req.body;
+  const note = await createNote(currentUserId(req), body);
 
   res.status(201).json({ note });
 });
@@ -69,7 +75,8 @@ notesRouter.get('/:id', async (req, res) => {
 });
 
 notesRouter.patch('/:id', validateBody(updateSchema), async (req, res) => {
-  const note = await updateNote(currentUserId(req), noteId(req.params.id), req.body);
+  const body: UpdateBody = req.body;
+  const note = await updateNote(currentUserId(req), noteId(req.params.id), body);
 
   res.json({ note });
 });
