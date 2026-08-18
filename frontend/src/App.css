@@ -521,6 +521,12 @@
   margin-bottom: 1.25rem;
 }
 
+/* .button is full width for the auth forms, which is wrong in a toolbar */
+.notes-bar .button,
+.editor-bar .button {
+  width: auto;
+}
+
 .note-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
