@@ -3,6 +3,11 @@ import request from 'supertest';
 
 import { createApp } from '../src/app.js';
 import { isDatabaseReachable, prisma } from '../src/db/prisma.js';
+import {
+  createNote as createNoteDirectly,
+  updateNote as updateNoteDirectly,
+} from '../src/services/notesService.js';
+import { HttpError } from '../src/utils/httpError.js';
 
 const app = createApp();
 
@@ -21,6 +26,17 @@ async function createNote(agent: ReturnType<typeof request.agent>, title: string
   const response = await agent.post('/api/notes').send({ title, content });
 
   return response.body.note;
+}
+
+/** Runs something expected to fail and hands back whatever it threw. */
+async function thrownBy(run: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await run();
+
+    return null;
+  } catch (error) {
+    return error;
+  }
 }
 
 after(async () => {
@@ -193,6 +209,30 @@ describe('notes', function () {
 
       expect(response.status).to.equal(404);
       expect(await prisma.note.count()).to.equal(1);
+    });
+  });
+
+  describe('the service called directly', () => {
+    it('refuses a bad payload even though no route validated it', async () => {
+      await signIn('ahtsham@example.com');
+      const { id: authorId } = await prisma.user.findFirstOrThrow();
+
+      const error = await thrownBy(() => createNoteDirectly(authorId, { title: '   ', content: '' }));
+
+      expect(error).to.be.instanceOf(HttpError);
+      expect((error as HttpError).statusCode).to.equal(400);
+      expect(await prisma.note.count()).to.equal(0);
+    });
+
+    it('refuses an update with nothing in it', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      const note = await createNote(agent, 'Shopping');
+      const { id: authorId } = await prisma.user.findFirstOrThrow();
+
+      const error = await thrownBy(() => updateNoteDirectly(authorId, note.id, {}));
+
+      expect(error).to.be.instanceOf(HttpError);
+      expect((error as HttpError).statusCode).to.equal(400);
     });
   });
 
