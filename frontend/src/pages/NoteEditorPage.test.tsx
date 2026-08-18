@@ -52,7 +52,7 @@ describe('NoteEditorPage', () => {
     expect(bodyOf('PATCH /api/notes/1')).toMatchObject({ title: 'Groceries' });
   });
 
-  it('marks unsaved changes as they are made', async () => {
+  it('marks unsaved changes the moment they are made', async () => {
     stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
 
     renderApp('/notes/1');
@@ -60,6 +60,60 @@ describe('NoteEditorPage', () => {
 
     await user.type(await screen.findByLabelText('Title'), '!');
 
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
+  it('saves on its own once the typing stops', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes/1': { status: 200, body: { note } },
+      'PATCH /api/notes/1': { status: 200, body: { note } },
+    });
+
+    renderApp('/notes/1');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Title'), '!');
+
+    // nobody pressed Save - the debounce did it
+    await screen.findByText('Saved', undefined, { timeout: 4000 });
+    expect(bodyOf('PATCH /api/notes/1')).toMatchObject({ title: 'Shopping!' });
+  });
+
+  it('says so and keeps the text when an automatic save fails', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes/1': { status: 200, body: { note } },
+      'PATCH /api/notes/1': { status: 0, networkError: true },
+    });
+
+    renderApp('/notes/1');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Title'), '!');
+
+    expect(await screen.findByRole('alert', undefined, { timeout: 4000 })).toHaveTextContent(
+      'Could not save',
+    );
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('Shopping!');
+  });
+
+  it('does not create a new note behind your back', async () => {
+    stubApi({ ...signedIn, 'POST /api/notes': { status: 201, body: { note } } });
+
+    renderApp('/notes/new');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Title'), 'Half a thought');
+
+    // well past the debounce a saved note would have used
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const posts = (globalThis.fetch as jest.Mock).mock.calls.filter(
+      ([, init]) => init?.method === 'POST',
+    );
+    expect(posts).toHaveLength(0);
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
 

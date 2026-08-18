@@ -1,10 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError, byField } from '../api/client';
 import { createNote, deleteNote, getNote, updateNote } from '../api/notes';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { FormField } from './FormField';
+
+/** How long to wait after the last keystroke before saving. */
+const saveDelayMs = 1000;
+
+type Status = 'saved' | 'unsaved' | 'saving' | 'failed';
+
+const wording: Record<Status, string> = {
+  saved: 'Saved',
+  unsaved: 'Unsaved changes',
+  saving: 'Saving...',
+  failed: 'Not saved',
+};
 
 /** The screen for writing one note, whether it exists yet or not. */
 export function NoteEditorPage() {
@@ -16,11 +28,19 @@ export function NoteEditorPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(noteId !== null);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [status, setStatus] = useState<Status>('saved');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // the pending save reads these rather than the state it closed over, so a
+  // keystroke landing while it waits is not left behind
+  const latest = useRef({ title, content });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    latest.current = { title, content };
+  }, [title, content]);
 
   useEffect(() => {
     if (noteId === null) {
@@ -49,7 +69,15 @@ export function NoteEditorPage() {
     };
   }, [noteId]);
 
-  /** Reports what the API objected to, by field where it said. */
+  // a timer left running after the screen closes would set state on nothing
+  useEffect(
+    () => () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  /** Reports what the API objected to, by field where it said so. */
   function handleFailure(cause: unknown) {
     if (cause instanceof ApiError) {
       setFieldErrors(byField(cause.fieldErrors));
@@ -57,34 +85,61 @@ export function NoteEditorPage() {
       return;
     }
 
-    setError('Could not save. Check your connection and try again.');
+    setError('Could not save. Your last change is still here - try again.');
   }
 
-  async function handleSave() {
-    setSaving(true);
+  async function save() {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+
+    setStatus('saving');
     setError(null);
     setFieldErrors({});
 
     try {
       if (noteId === null) {
-        const created = await createNote({ title, content });
+        const created = await createNote(latest.current);
         navigate(`/notes/${created.id}`, { replace: true });
       } else {
-        await updateNote(noteId, { title, content });
+        await updateNote(noteId, latest.current);
       }
 
-      setDirty(false);
+      setStatus('saved');
     } catch (cause) {
+      setStatus('failed');
       handleFailure(cause);
-    } finally {
-      setSaving(false);
     }
+  }
+
+  /** Called on every edit. Existing notes save themselves, new ones wait. */
+  function changed() {
+    setStatus('unsaved');
+
+    if (noteId === null) {
+      return;
+    }
+
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = setTimeout(() => void save(), saveDelayMs);
+  }
+
+  /** Leaves, but not before whatever is still pending has gone up. */
+  async function handleBack() {
+    if (status === 'unsaved' && noteId !== null) {
+      await save();
+    }
+
+    navigate('/');
   }
 
   async function handleDelete() {
     if (noteId === null) {
       return;
     }
+
+    if (timer.current !== null) clearTimeout(timer.current);
 
     try {
       await deleteNote(noteId);
@@ -106,11 +161,13 @@ export function NoteEditorPage() {
   return (
     <main className="app-main">
       <div className="editor-bar">
-        <button type="button" className="button button-ghost" onClick={() => navigate('/')}>
+        <button type="button" className="button button-ghost" onClick={() => void handleBack()}>
           Back
         </button>
 
-        <span className="muted">{dirty ? 'Unsaved changes' : 'Saved'}</span>
+        <span className="muted" role="status">
+          {wording[status]}
+        </span>
 
         <div className="editor-bar-actions">
           {noteId !== null &&
@@ -145,10 +202,10 @@ export function NoteEditorPage() {
           <button
             type="button"
             className="button"
-            disabled={saving}
-            onClick={() => void handleSave()}
+            disabled={status === 'saving'}
+            onClick={() => void save()}
           >
-            {saving ? 'Saving...' : 'Save'}
+            Save
           </button>
         </div>
       </div>
@@ -167,7 +224,7 @@ export function NoteEditorPage() {
         error={fieldErrors.title}
         onChange={(value) => {
           setTitle(value);
-          setDirty(true);
+          changed();
         }}
       />
 
@@ -175,7 +232,7 @@ export function NoteEditorPage() {
         content={content}
         onChange={(html) => {
           setContent(html);
-          setDirty(true);
+          changed();
         }}
       />
       {fieldErrors.content !== undefined && (
