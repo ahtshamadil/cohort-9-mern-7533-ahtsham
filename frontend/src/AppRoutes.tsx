@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { NoteEditorPage } from './pages/NoteEditorPage';
 import { RegisterPage } from './pages/RegisterPage';
 
 /**
@@ -17,6 +18,8 @@ export function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/notes/new" element={<NoteEditorPage />} />
+        <Route path="/notes/:id" element={<NoteEditorPage />} />
       </Route>
 
       {/* anything unrecognised goes home, and the guard decides from there */}
