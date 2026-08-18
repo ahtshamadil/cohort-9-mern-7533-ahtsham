@@ -1,8 +1,9 @@
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
+import { useEffect } from 'react';
 import StarterKit from '@tiptap/starter-kit';
 
 export interface RichTextEditorProps {
-  /** Starting HTML. Changing it later does not reload the editor. */
+  /** The HTML to show. Replaced in place when it changes. */
   content: string;
   onChange: (html: string) => void;
 }
@@ -16,6 +17,18 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
       onChange(changed.getHTML());
     },
   });
+
+  // switching to another note changes this prop without unmounting, and useEditor
+  // only reads content once. without this the previous note's body stays on
+  // screen and the next save writes it over the note now being shown.
+  useEffect(() => {
+    if (editor === null || content === editor.getHTML()) {
+      return;
+    }
+
+    // emitUpdate would look like the user typing and mark the note dirty
+    editor.commands.setContent(content, { emitUpdate: false });
+  }, [editor, content]);
 
   const active = useEditorState({
     editor,

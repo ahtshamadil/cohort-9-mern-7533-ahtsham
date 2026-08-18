@@ -55,4 +55,29 @@ describe('RichTextEditor', () => {
     expect(changes.at(-1)).not.toContain('script');
     expect(document.body.innerHTML).not.toContain('<script>');
   });
+
+  it('swaps in new content when a different note is shown', async () => {
+    const { rerender } = render(<RichTextEditor content="<p>Note one</p>" onChange={() => {}} />);
+    expect(await screen.findByText('Note one')).toBeInTheDocument();
+
+    rerender(<RichTextEditor content="<p>Note two</p>" onChange={() => {}} />);
+
+    expect(await screen.findByText('Note two')).toBeInTheDocument();
+    expect(screen.queryByText('Note one')).not.toBeInTheDocument();
+  });
+
+  it('does not report a change back when content is swapped in', async () => {
+    const changes: string[] = [];
+    const { rerender } = render(
+      <RichTextEditor content="<p>Note one</p>" onChange={(html) => changes.push(html)} />,
+    );
+    await screen.findByText('Note one');
+
+    rerender(<RichTextEditor content="<p>Note two</p>" onChange={(html) => changes.push(html)} />);
+    await screen.findByText('Note two');
+
+    // an update event here would look like the user editing, and autosave would
+    // write the incoming note straight back out again
+    expect(changes).toHaveLength(0);
+  });
 });
