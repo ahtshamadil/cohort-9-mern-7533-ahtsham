@@ -53,12 +53,31 @@ export function deleteNote(id: number): Promise<void> {
   return apiFetch<void>(`/api/notes/${id}`, { method: 'DELETE' });
 }
 
+// paragraphs, list items and headings, but not the wrappers around them
+const blocks = 'p, li, h1, h2, h3, h4, blockquote, pre';
+
 /**
  * The body as plain text, for the list cards.
  *
  * Content is stored as HTML. Parsing it and taking the text keeps markup out of
- * the list rather than rendering somebody's tags.
+ * the list rather than rendering somebody's tags. Each block is read separately
+ * and joined with a space, because textContent alone runs the last word of one
+ * paragraph into the first word of the next.
  */
 export function plainText(html: string): string {
-  return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
+  const { body } = new DOMParser().parseFromString(html, 'text/html');
+
+  const leaves = Array.from(body.querySelectorAll(blocks)).filter(
+    // a list item holding a paragraph would otherwise count its text twice
+    (block) => block.querySelector(blocks) === null,
+  );
+
+  if (leaves.length === 0) {
+    return body.textContent?.trim() ?? '';
+  }
+
+  return leaves
+    .map((block) => block.textContent?.trim() ?? '')
+    .filter((text) => text !== '')
+    .join(' ');
 }
