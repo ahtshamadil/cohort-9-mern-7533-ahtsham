@@ -191,4 +191,43 @@ describe('NoteEditorPage', () => {
     expect(screen.getByDisplayValue('Shopping')).toBeInTheDocument();
     expect(screen.queryByText('Delete this note?')).not.toBeInTheDocument();
   });
+
+  it('stays on the page when leaving would lose a failed save', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes/1': { status: 200, body: { note } },
+      'PATCH /api/notes/1': { status: 0, networkError: true },
+    });
+
+    renderApp('/notes/1');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Title'), '!');
+    await screen.findByText('Not saved', undefined, { timeout: 4000 });
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    // still here, still holding the text, rather than back at the list with it gone
+    expect(screen.getByLabelText('Title')).toHaveValue('Shopping!');
+    expect(screen.queryByRole('heading', { name: 'Everything worth remembering' })).toBeNull();
+  });
+
+  it('goes back once the pending save has gone up', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes/1': { status: 200, body: { note } },
+      'PATCH /api/notes/1': { status: 200, body: { note } },
+      'GET /api/notes': { status: 200, body: { notes: [note] } },
+    });
+
+    renderApp('/notes/1');
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Title'), '!');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Everything worth remembering' }),
+    ).toBeInTheDocument();
+  });
 });

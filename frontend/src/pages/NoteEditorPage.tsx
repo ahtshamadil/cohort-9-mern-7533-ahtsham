@@ -88,7 +88,8 @@ export function NoteEditorPage() {
     setError('Could not save. Your last change is still here - try again.');
   }
 
-  async function save() {
+  /** Saves, and says whether it worked so callers can stay put if it did not. */
+  async function save(): Promise<boolean> {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -107,9 +108,13 @@ export function NoteEditorPage() {
       }
 
       setStatus('saved');
+
+      return true;
     } catch (cause) {
       setStatus('failed');
       handleFailure(cause);
+
+      return false;
     }
   }
 
@@ -127,8 +132,12 @@ export function NoteEditorPage() {
 
   /** Leaves, but not before whatever is still pending has gone up. */
   async function handleBack() {
-    if (status === 'unsaved' && noteId !== null) {
-      await save();
+    // failed counts as pending - the text is still only in the browser
+    if ((status === 'unsaved' || status === 'failed') && noteId !== null) {
+      // staying put beats navigating away from work that never reached the server
+      if (!(await save())) {
+        return;
+      }
     }
 
     navigate('/');
