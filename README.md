@@ -185,9 +185,9 @@ log-in form.
 ### How the frontend knows who is signed in
 
 It asks. The session cookie is `httpOnly`, which means JavaScript cannot read it -
-that is the point of it, since a script injected into the page cannot steal a session
-it cannot see. So there is nothing in the browser to inspect, and the only way to
-find out is to call `GET /api/auth/me` when the app starts.
+a script on the page can still call the API as you, but it cannot copy the token out
+and use it somewhere else. So there is nothing in the browser to inspect, and the only
+way to find out is to call `GET /api/auth/me` when the app starts.
 
 That call has three outcomes, and the guard treats them differently:
 

@@ -1,43 +1,40 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-import { apiFetch } from '../api/client';
+import { listNotes, plainText, type Note } from '../api/notes';
 import { useAuth } from '../auth/useAuth';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
-
-/** Shape of the payload returned by the backend's /api/health route. */
-interface Health {
-  status: string;
-  uptime: number;
-  database?: string;
-}
 
 /** The first letter of whatever we can call this person, for the avatar. */
 function initial(from: string): string {
   return from.trim().charAt(0).toUpperCase();
 }
 
-/**
- * The signed-in landing screen.
- *
- * A placeholder for now: it proves the session works and offers a way out. The
- * list of notes lands here in the notes PR.
- */
+/** When a note was last touched, in the reader's own locale. */
+function changed(at: string): string {
+  return new Date(at).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** The signed-in landing screen: everything this person has written. */
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [health, setHealth] = useState<Health | null>(null);
+  const [notes, setNotes] = useState<Note[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    apiFetch<Health>('/api/health')
-      .then((data) => {
-        if (!cancelled) setHealth(data);
+    listNotes()
+      .then((found) => {
+        if (!cancelled) setNotes(found);
       })
       .catch((cause: Error) => {
         if (!cancelled) setError(cause.message);
@@ -94,23 +91,40 @@ export function DashboardPage() {
           <p className="muted">Signed in as {displayName}</p>
         </div>
 
-        <div className="empty-state">
-          <h2>A clean slate</h2>
-          <p>Your notes will appear here once the editor lands.</p>
+        <div className="notes-bar">
+          <Link className="button" to="/notes/new">
+            New note
+          </Link>
         </div>
 
-        <p className="status-row">
-          <span
-            className={`status-dot ${health ? 'status-dot-ok' : ''} ${error !== null ? 'status-dot-down' : ''}`}
-          />
-          {health && (
-            <>
-              API status: <strong>{health.status}</strong>
-            </>
-          )}
-          {error !== null && <>Could not reach the API: {error}</>}
-          {!health && error === null && <>Checking the API...</>}
-        </p>
+        {error !== null && (
+          <p className="form-error" role="alert">
+            Could not load your notes: {error}
+          </p>
+        )}
+
+        {notes !== null && notes.length === 0 && (
+          <div className="empty-state">
+            <h2>A clean slate</h2>
+            <p>Nothing written yet. Start with a new note.</p>
+          </div>
+        )}
+
+        {notes !== null && notes.length > 0 && (
+          <ul className="note-list">
+            {notes.map((note) => (
+              <li key={note.id}>
+                <Link className="note-card" to={`/notes/${note.id}`}>
+                  <h2 className="note-card-title">{note.title}</h2>
+                  <p className="note-card-excerpt">{plainText(note.content)}</p>
+                  <p className="note-card-date">{changed(note.updatedAt)}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {notes === null && error === null && <p className="muted">Loading your notes...</p>}
       </main>
     </div>
   );
