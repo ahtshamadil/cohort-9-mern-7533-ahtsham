@@ -1,5 +1,6 @@
 import { prisma } from '../db/prisma.js';
 import { HttpError } from '../utils/httpError.js';
+import { logger } from '../utils/logger.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 
 /** A user without the password hash. */
@@ -35,7 +36,7 @@ export async function registerUser(input: {
   const passwordHash = await hashPassword(input.password);
 
   try {
-    return await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email: normaliseEmail(input.email),
         passwordHash,
@@ -43,6 +44,10 @@ export async function registerUser(input: {
       },
       select: publicFields,
     });
+
+    logger.info({ userId: user.id }, 'User registered');
+
+    return user;
   } catch (error) {
     // P2002 is prisma's unique constraint code. letting the database refuse the
     // duplicate avoids the race a findUnique-then-create would have
@@ -65,12 +70,16 @@ export async function authenticateUser(email: string, password: string): Promise
 
   if (user === null) {
     await verifyPassword(password, await decoyHash);
+    logger.warn('Failed login');
     throw invalid;
   }
 
   if (!(await verifyPassword(password, user.passwordHash))) {
+    logger.warn({ userId: user.id }, 'Failed login');
     throw invalid;
   }
+
+  logger.info({ userId: user.id }, 'User logged in');
 
   return toPublicUser(user);
 }

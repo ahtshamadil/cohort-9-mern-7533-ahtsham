@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
+import { notesRouter } from './routes/notes.js';
 
 /** Builds the express app with middleware and routes wired up. */
 export function createApp(): Express {
@@ -19,6 +20,7 @@ export function createApp(): Express {
 
   app.use('/api', healthRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/notes', notesRouter);
 
   // these two go last - only reached if nothing above handled the request
   app.use(notFoundHandler);

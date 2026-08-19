@@ -6,6 +6,7 @@ import { validateBody } from '../middleware/validate.js';
 import { authenticateUser, findUserById, registerUser } from '../services/authService.js';
 import { clearAuthCookie, setAuthCookie } from '../utils/authCookie.js';
 import { HttpError } from '../utils/httpError.js';
+import { logger } from '../utils/logger.js';
 import { signToken } from '../utils/token.js';
 
 export const authRouter = Router();
@@ -41,6 +42,8 @@ authRouter.post('/login', validateBody(loginSchema), async (req, res) => {
 
 authRouter.post('/logout', (_req, res) => {
   clearAuthCookie(res);
+
+  logger.info('User logged out');
 
   res.status(204).send();
 });
