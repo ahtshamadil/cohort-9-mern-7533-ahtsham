@@ -6,7 +6,9 @@ import {
   createNote,
   createNoteSchema,
   deleteNote,
+  exportNotes,
   getNote,
+  importNotes,
   listNotes,
   updateNote,
   updateNoteSchema,
@@ -30,7 +32,7 @@ function noteId(value: string | string[]): number {
 }
 
 notesRouter.get('/', async (req, res) => {
-  const notes = await listNotes(currentUserId(req));
+  const notes = await listNotes(currentUserId(req), req.query);
 
   res.json({ notes });
 });
@@ -40,6 +42,21 @@ notesRouter.post('/', validateBody(createNoteSchema), async (req, res) => {
   const note = await createNote(currentUserId(req), body);
 
   res.status(201).json({ note });
+});
+
+// both of these have to sit above /:id, which would otherwise read the word as an id
+notesRouter.get('/export', async (req, res) => {
+  const file = await exportNotes(currentUserId(req));
+  const today = new Date().toISOString().slice(0, 10);
+
+  res.attachment(`slate-notes-${today}.json`);
+  res.json(file);
+});
+
+notesRouter.post('/import', async (req, res) => {
+  const imported = await importNotes(currentUserId(req), req.body);
+
+  res.status(201).json({ imported });
 });
 
 notesRouter.get('/:id', async (req, res) => {
