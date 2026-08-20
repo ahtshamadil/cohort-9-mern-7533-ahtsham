@@ -6,7 +6,8 @@ import {
   createNote,
   createNoteSchema,
   deleteNote,
-  exportNotes,
+  eachNoteToExport,
+  exportVersion,
   getNote,
   importNotes,
   listNotes,
@@ -16,6 +17,7 @@ import {
   type UpdateNoteInput,
 } from '../services/notesService.js';
 import { HttpError } from '../utils/httpError.js';
+import { logger } from '../utils/logger.js';
 
 export const notesRouter = Router();
 
@@ -46,11 +48,25 @@ notesRouter.post('/', validateBody(createNoteSchema), async (req, res) => {
 
 // both of these have to sit above /:id, which would otherwise read the word as an id
 notesRouter.get('/export', async (req, res) => {
-  const file = await exportNotes(currentUserId(req));
+  const authorId = currentUserId(req);
   const today = new Date().toISOString().slice(0, 10);
 
   res.attachment(`slate-notes-${today}.json`);
-  res.json(file);
+
+  // written a note at a time rather than built and handed to res.json, so a big
+  // account does not have to fit in memory twice over
+  res.write(`{"version":${exportVersion},"exportedAt":${JSON.stringify(new Date())},"notes":[`);
+
+  let count = 0;
+
+  for await (const note of eachNoteToExport(authorId)) {
+    res.write(count === 0 ? JSON.stringify(note) : `,${JSON.stringify(note)}`);
+    count += 1;
+  }
+
+  res.end(']}');
+
+  logger.info({ userId: authorId, count }, 'Notes exported');
 });
 
 notesRouter.post('/import', async (req, res) => {

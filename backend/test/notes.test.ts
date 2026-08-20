@@ -6,6 +6,7 @@ import { isDatabaseReachable, prisma } from '../src/db/prisma.js';
 import {
   contentLimit,
   createNote as createNoteDirectly,
+  exportBatch,
   exportVersion,
   importLimit,
   updateNote as updateNoteDirectly,
@@ -276,6 +277,27 @@ describe('notes', function () {
       expect(response.headers['content-disposition']).to.contain('slate-notes-');
     });
 
+    it('carries on past the end of one page of notes', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      const { id: authorId } = await prisma.user.findFirstOrThrow();
+      const wanted = exportBatch + 1;
+
+      await prisma.note.createMany({
+        data: Array.from({ length: wanted }, (_value, index) => ({
+          title: `Note ${index}`,
+          content: `<p>Body ${index}</p>`,
+          contentText: `Body ${index}`,
+          authorId,
+        })),
+      });
+
+      const response = await agent.get('/api/notes/export');
+
+      expect(response.body.notes).to.have.lengthOf(wanted);
+      expect(response.body.notes[0].title).to.equal('Note 0');
+      expect(response.body.notes[wanted - 1].title).to.equal(`Note ${wanted - 1}`);
+    });
+
     it('is not mistaken for a note id', async () => {
       const agent = await signIn('ahtsham@example.com');
 
@@ -426,6 +448,18 @@ describe('notes', function () {
 
       expect(response.status).to.equal(400);
       expect(response.body.error.message).to.contain('JSON');
+    });
+
+    it('does not call an unreadable character set bad json', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      const response = await agent
+        .post('/api/notes')
+        .set('Content-Type', 'application/json; charset=made-up')
+        .send('{"title":"Shopping"}');
+
+      expect(response.status).to.equal(415);
+      expect(response.body.error.message).to.contain('character set');
     });
   });
 

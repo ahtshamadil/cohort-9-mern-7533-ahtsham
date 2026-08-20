@@ -23,12 +23,8 @@ export interface ExportedNote {
   updatedAt: Date;
 }
 
-/** The whole of one user's notes, ready to write to a file. */
-export interface NotesExport {
-  version: number;
-  exportedAt: Date;
-  notes: ExportedNote[];
-}
+/** How many notes are read from the database at a time when exporting. */
+export const exportBatch = 100;
 
 /** The version this server writes, and the only one it reads back. */
 export const exportVersion = 1;
@@ -208,17 +204,46 @@ export async function deleteNote(authorId: number, id: number): Promise<void> {
   logger.info({ userId: authorId, noteId: id }, 'Note deleted');
 }
 
-/** Everything the user has written, in the shape importNotes reads back. */
-export async function exportNotes(authorId: number): Promise<NotesExport> {
-  const notes = await prisma.note.findMany({
-    where: { authorId },
-    orderBy: { createdAt: 'asc' },
-    select: exportFields,
-  });
+/**
+ * Everything the user has written, in the shape importNotes reads back.
+ *
+ * Read a page at a time and handed over one note at a time, so an account with a
+ * lot of large notes never has all of them in memory at once. The pages walk by
+ * id because it is unique and stable, which a timestamp is not.
+ */
+export async function* eachNoteToExport(authorId: number): AsyncGenerator<ExportedNote> {
+  let after: number | undefined;
 
-  logger.info({ userId: authorId, count: notes.length }, 'Notes exported');
+  for (;;) {
+    const page = await prisma.note.findMany({
+      where: { authorId },
+      orderBy: { id: 'asc' },
+      take: exportBatch,
+      ...(after === undefined ? {} : { cursor: { id: after }, skip: 1 }),
+      select: { id: true, ...exportFields },
+    });
 
-  return { version: exportVersion, exportedAt: new Date(), notes };
+    const last = page.at(-1);
+
+    if (last === undefined) {
+      return;
+    }
+
+    for (const note of page) {
+      yield {
+        title: note.title,
+        content: note.content,
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+      };
+    }
+
+    if (page.length < exportBatch) {
+      return;
+    }
+
+    after = last.id;
+  }
 }
 
 /** Adds the notes from an export file to the user's own, and says how many. */
