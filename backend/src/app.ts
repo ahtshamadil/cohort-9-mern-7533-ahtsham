@@ -14,6 +14,11 @@ export function createApp(): Express {
 
   app.use(helmet());
   app.use(requestLogger);
+  // rich text and whole-account imports are far bigger than the 100kb default
+  // allows. only the notes routes get the larger limit - the global parser below
+  // then sees a body that is already read and leaves it alone, so the
+  // unauthenticated auth routes keep the small one
+  app.use('/api/notes', express.json({ limit: '5mb' }));
   app.use(express.json());
   // populates req.cookies, which is where the session token arrives
   app.use(cookieParser());
