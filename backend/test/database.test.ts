@@ -64,7 +64,12 @@ describe('database', function () {
     });
 
     await prisma.note.create({
-      data: { title: 'First note', content: 'Some content', authorId: user.id },
+      data: {
+        title: 'First note',
+        content: 'Some content',
+        contentText: 'Some content',
+        authorId: user.id,
+      },
     });
 
     const notes = await prisma.note.findMany({ where: { authorId: user.id } });
@@ -78,7 +83,12 @@ describe('database', function () {
       data: { email: 'leaving@example.com', passwordHash: 'not-a-real-hash' },
     });
     await prisma.note.create({
-      data: { title: 'Goes away', content: 'Some content', authorId: user.id },
+      data: {
+        title: 'Goes away',
+        content: 'Some content',
+        contentText: 'Some content',
+        authorId: user.id,
+      },
     });
 
     await prisma.user.delete({ where: { id: user.id } });

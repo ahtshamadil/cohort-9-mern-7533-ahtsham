@@ -22,13 +22,18 @@ model User {
 }
 
 model Note {
-  id       Int    @id @default(autoincrement())
-  title    String
-  // Text rather than the default VARCHAR because notes hold rich text
-  content  String @db.Text
-  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId Int
+  id          Int    @id @default(autoincrement())
+  title       String
+  // MediumText rather than Text because rich text markup is several times the
+  // size of the words in it, and Text runs out at 65535 bytes
+  content     String @db.MediumText
+  // the same content with the markup taken out, so search does not match tag names
+  contentText String @db.MediumText
+  author      User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId    Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([authorId, updatedAt])
 }
