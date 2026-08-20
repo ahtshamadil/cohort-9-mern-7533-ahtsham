@@ -71,9 +71,55 @@ CORS setup of its own.
 | POST | `/api/auth/login` | Signs an existing account in |
 | POST | `/api/auth/logout` | Signs out |
 | GET | `/api/auth/me` | Returns the signed-in user, 401 if nobody is |
+| GET | `/api/notes` | Lists your notes, newest change first |
+| POST | `/api/notes` | Writes a new note |
+| GET | `/api/notes/:id` | Returns one note |
+| PATCH | `/api/notes/:id` | Changes the fields it is given |
+| DELETE | `/api/notes/:id` | Deletes a note |
+| GET | `/api/notes/export` | Downloads all your notes as a JSON file |
+| POST | `/api/notes/import` | Loads an export file back in |
 
 Register takes `email`, `password` and an optional `name`. Passwords need 8 characters
 or more. They get hashed with bcrypt before saving and never come back in a response.
+
+Every note route needs a session, and every one of them is scoped to the account that
+made the request. Asking for a note belonging to somebody else gives 404 rather than
+403 - a 403 would confirm the note exists.
+
+### Notes
+
+A note has a `title` of up to 191 characters and `content` holding the rich text as
+HTML. Both are checked in the service, so the rules hold whether a route validated the
+request or not.
+
+### Searching
+
+`GET /api/notes` takes two optional query parameters:
+
+- `q` - a word to look for, in the title or the body. Blank means no search
+- `sort` - one of `recent` (the default), `oldest`, `title` or `created`
+
+Notes are stored as HTML, so searching that directly would match tag names - a search
+for "strong" would find every note with something bold in it. Each note therefore also
+stores its own plain text in a second column, written on the way in, and that is the
+column search reads. It never leaves the server.
+
+Matching is case-insensitive because the tables are `utf8mb4_unicode_ci`, not because
+of anything in the query. `%` and `_` in a search are escaped, so they match themselves
+rather than acting as wildcards.
+
+### Export and import
+
+`GET /api/notes/export` sends a file of every note you own:
+
+```json
+{ "version": 1, "exportedAt": "2026-08-20T12:00:00.000Z", "notes": [] }
+```
+
+There are no ids in it, so the file can be loaded into a different account.
+`POST /api/notes/import` reads the same shape back, up to 200 notes at a time, keeps
+the dates each note was written with, and answers with how many arrived. One bad note
+rejects the whole file rather than importing half of it.
 
 ### Sessions
 
@@ -155,7 +201,7 @@ Inside `backend/src`:
 - `routes/` - the endpoints
 - `services/` - the work behind the endpoints, kept out of the route handlers
 - `types/` - extra typings, currently the user id that the auth guard attaches
-- `utils/` - logger, password hashing, tokens, the session cookie
+- `utils/` - logger, password hashing, tokens, the session cookie, html to text
 - `app.ts` - builds the express app
 - `index.ts` - starts the server
 
