@@ -188,6 +188,9 @@ export function DashboardPage() {
               type="search"
               className="notes-search"
               placeholder="Search your notes"
+              // the API refuses a longer term, and stopping it here beats
+              // answering a search with "Validation failed"
+              maxLength={191}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
