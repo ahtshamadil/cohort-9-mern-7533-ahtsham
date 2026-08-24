@@ -58,8 +58,19 @@ export function stubApi(routes: Record<string, StubbedResponse>): void {
         Promise.resolve(
           new Blob([JSON.stringify(match.body ?? null)], { type: 'application/json' }),
         ),
-      // jsdom ships no Headers, so get() is the one method worth standing in for
-      headers: { get: (name: string) => match.headers?.[name] ?? null },
+      // jsdom ships no Headers, so get() is the one method worth standing in
+      // for. matched without case, because the real one ignores it and a stub
+      // written as content-disposition would otherwise read back as absent
+      headers: {
+        get: (name: string) => {
+          const wanted = name.toLowerCase();
+          const found = Object.entries(match.headers ?? {}).find(
+            ([key]) => key.toLowerCase() === wanted,
+          );
+
+          return found?.[1] ?? null;
+        },
+      },
     } as unknown as Response;
 
     if (match.delayMs === undefined) {

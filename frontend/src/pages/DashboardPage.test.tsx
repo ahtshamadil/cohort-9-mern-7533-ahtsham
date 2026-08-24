@@ -215,6 +215,37 @@ describe('DashboardPage', () => {
     await waitFor(() => expect(saved).toEqual(['slate-notes-2026-08-24.json']));
   });
 
+  it('reads the filename however the header is cased', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'GET /api/notes/export': {
+        status: 200,
+        body: { version: 1, notes: [] },
+        // servers send this lowercased, and Headers.get ignores case
+        headers: { 'content-disposition': 'attachment; filename="slate-notes-2026-01-02.json"' },
+      },
+    });
+
+    URL.createObjectURL = jest.fn(() => 'blob:slate');
+    URL.revokeObjectURL = jest.fn();
+
+    const saved: string[] = [];
+    jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        saved.push(this.download);
+      });
+
+    renderApp('/');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Export/ }));
+    await user.click(screen.getByRole('menuitem', { name: /JSON/ }));
+
+    await waitFor(() => expect(saved).toEqual(['slate-notes-2026-01-02.json']));
+  });
+
   it('downloads a text copy built from every note', async () => {
     stubApi({ ...signedIn, 'GET /api/notes': both });
 
