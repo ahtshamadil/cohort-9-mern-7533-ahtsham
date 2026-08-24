@@ -1,4 +1,29 @@
-import { plainText } from './notes';
+import { restoreFetch, stubApi } from '../test/harness';
+import { listNotes, plainText } from './notes';
+
+// the stub rejects any key it was not given, so a wrong url fails as a rejection
+// rather than needing a spy on fetch to assert against
+describe('listNotes', () => {
+  afterEach(restoreFetch);
+
+  it('asks for nothing extra when nothing is asked for', async () => {
+    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [] } } });
+
+    await expect(listNotes()).resolves.toEqual([]);
+  });
+
+  it('leaves out a blank search and the default sort', async () => {
+    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [] } } });
+
+    await expect(listNotes({ q: '   ', sort: 'recent' })).resolves.toEqual([]);
+  });
+
+  it('sends the search and the sort when they are asked for', async () => {
+    stubApi({ 'GET /api/notes?q=milk&sort=title': { status: 200, body: { notes: [] } } });
+
+    await expect(listNotes({ q: ' milk ', sort: 'title' })).resolves.toEqual([]);
+  });
+});
 
 describe('plainText', () => {
   it('keeps the words and drops the tags', () => {
