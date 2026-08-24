@@ -12,6 +12,7 @@ import {
   type NoteSort,
 } from '../api/notes';
 import { useAuth } from '../auth/useAuth';
+import { ExportMenu, type ExportFormat } from '../components/ExportMenu';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -99,14 +100,20 @@ export function DashboardPage() {
     }
   }
 
-  /** Runs one of the two exports and says how it went. */
-  async function saveExport(save: () => Promise<void>, done: string) {
+  /** Runs whichever export the menu asked for and says how it went. */
+  async function saveExport(format: ExportFormat) {
     setBusy(true);
     setNotice(null);
 
     try {
-      await save();
-      setNotice({ text: done, failed: false });
+      await (format === 'json' ? exportNotes() : exportNotesAsText());
+      setNotice({
+        text:
+          format === 'json'
+            ? 'Your notes have been downloaded.'
+            : 'A text copy of your notes has been downloaded.',
+        failed: false,
+      });
     } catch (cause) {
       const because = cause instanceof Error ? cause.message : 'something went wrong';
       setNotice({ text: `Could not export your notes: ${because}`, failed: true });
@@ -123,6 +130,14 @@ export function DashboardPage() {
     event.target.value = '';
 
     if (file === undefined) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setNotice({
+        text: 'Import needs a .json export file. Use Export to make one.',
+        failed: true,
+      });
       return;
     }
 
@@ -206,30 +221,12 @@ export function DashboardPage() {
           </div>
 
           <div className="notes-actions">
-            <button
-              type="button"
-              className="button button-ghost"
-              disabled={busy}
-              onClick={() => void saveExport(exportNotes, 'Your notes have been downloaded.')}
-            >
-              Export JSON
-            </button>
-
-            <button
-              type="button"
-              className="button button-ghost"
-              disabled={busy}
-              onClick={() =>
-                void saveExport(exportNotesAsText, 'A text copy of your notes has been downloaded.')
-              }
-            >
-              Export text
-            </button>
+            <ExportMenu disabled={busy} onChoose={(format) => void saveExport(format)} />
 
             {/* a label rather than a button reaching for a hidden input, so the
                 control announced is the file input itself */}
             <label className="button button-ghost" htmlFor="notes-import">
-              Import
+              Import JSON
             </label>
             <input
               id="notes-import"

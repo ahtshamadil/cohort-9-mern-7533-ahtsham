@@ -209,7 +209,8 @@ describe('DashboardPage', () => {
     renderApp('/');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Export JSON' }));
+    await user.click(await screen.findByRole('button', { name: /Export/ }));
+    await user.click(screen.getByRole('menuitem', { name: /JSON/ }));
 
     await waitFor(() => expect(saved).toEqual(['slate-notes-2026-08-24.json']));
   });
@@ -234,7 +235,8 @@ describe('DashboardPage', () => {
     renderApp('/');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Export text' }));
+    await user.click(await screen.findByRole('button', { name: /Export/ }));
+    await user.click(screen.getByRole('menuitem', { name: /Plain text/ }));
 
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(saved[0]).toMatch(/^slate-notes-\d{4}-\d{2}-\d{2}\.txt$/);
@@ -256,9 +258,26 @@ describe('DashboardPage', () => {
       type: 'application/json',
     });
 
-    await user.upload(screen.getByLabelText('Import'), file);
+    await user.upload(screen.getByLabelText('Import JSON'), file);
 
     expect(await screen.findByText('Imported 2 notes.')).toBeInTheDocument();
+  });
+
+  it('turns away a file that is not a json export', async () => {
+    stubApi({ ...signedIn, 'GET /api/notes': both });
+
+    renderApp('/');
+    // userEvent honours the accept attribute and would drop this file without a
+    // word - that is the picker's own filter working. turning it off is what a
+    // person switching the picker to "all files" does
+    const user = userEvent.setup({ applyAccept: false });
+    await screen.findByRole('heading', { name: 'Ideas' });
+
+    const file = new File(['not json at all'], 'notes.txt', { type: 'text/plain' });
+    await user.upload(screen.getByLabelText('Import JSON'), file);
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(within(alerts[0]).getByText(/needs a .json export file/)).toBeInTheDocument();
   });
 
   it('reports what the API objected to in an import file', async () => {
@@ -276,7 +295,7 @@ describe('DashboardPage', () => {
     await screen.findByRole('heading', { name: 'Ideas' });
 
     const file = new File(['{"version":2,"notes":[]}'], 'old.json', { type: 'application/json' });
-    await user.upload(screen.getByLabelText('Import'), file);
+    await user.upload(screen.getByLabelText('Import JSON'), file);
 
     const alerts = await screen.findAllByRole('alert');
     expect(within(alerts[0]).getByText(/Unsupported export version/)).toBeInTheDocument();
