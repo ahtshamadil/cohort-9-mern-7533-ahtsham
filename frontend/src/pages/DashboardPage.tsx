@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import {
   exportNotes,
+  exportNotesAsText,
   importNotes,
   listNotes,
   plainText,
@@ -23,11 +24,6 @@ const sortOptions: { value: NoteSort; label: string }[] = [
   { value: 'created', label: 'Newest first' },
   { value: 'title', label: 'Title A to Z' },
 ];
-
-/** The first letter of whatever we can call this person, for the avatar. */
-function initial(from: string): string {
-  return from.trim().charAt(0).toUpperCase();
-}
 
 /** When a note was last touched, in the reader's own locale. */
 function changed(at: string): string {
@@ -103,14 +99,14 @@ export function DashboardPage() {
     }
   }
 
-  /** Saves every note to a file, or says why it could not. */
-  async function handleExport() {
+  /** Runs one of the two exports and says how it went. */
+  async function saveExport(save: () => Promise<void>, done: string) {
     setBusy(true);
     setNotice(null);
 
     try {
-      await exportNotes();
-      setNotice({ text: 'Your notes have been downloaded.', failed: false });
+      await save();
+      setNotice({ text: done, failed: false });
     } catch (cause) {
       const because = cause instanceof Error ? cause.message : 'something went wrong';
       setNotice({ text: `Could not export your notes: ${because}`, failed: true });
@@ -156,9 +152,7 @@ export function DashboardPage() {
 
         <div className="app-header-actions">
           <ThemeToggle />
-          <span className="avatar" title={displayName}>
-            {initial(displayName)}
-          </span>
+          <span className="app-user">{displayName}</span>
           <button type="button" className="button button-ghost" onClick={() => void handleLogout()}>
             Log out
           </button>
@@ -175,7 +169,6 @@ export function DashboardPage() {
         <div className="page-heading">
           <p className="eyebrow">Your slate</p>
           <h1>Everything worth remembering</h1>
-          <p className="muted">Signed in as {displayName}</p>
         </div>
 
         <div className="notes-bar">
@@ -217,9 +210,20 @@ export function DashboardPage() {
               type="button"
               className="button button-ghost"
               disabled={busy}
-              onClick={() => void handleExport()}
+              onClick={() => void saveExport(exportNotes, 'Your notes have been downloaded.')}
             >
-              Export
+              Export JSON
+            </button>
+
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={busy}
+              onClick={() =>
+                void saveExport(exportNotesAsText, 'A text copy of your notes has been downloaded.')
+              }
+            >
+              Export text
             </button>
 
             {/* a label rather than a button reaching for a hidden input, so the

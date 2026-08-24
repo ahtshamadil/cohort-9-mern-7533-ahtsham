@@ -83,14 +83,15 @@ export function deleteNote(id: number): Promise<void> {
 const blocks = 'p, li, h1, h2, h3, h4, blockquote, pre';
 
 /**
- * The body as plain text, for the list cards.
+ * The body as plain text, joined with `between` - a space for the list cards, a
+ * newline for a text export.
  *
  * Content is stored as HTML. Parsing it and taking the text keeps markup out of
  * the list rather than rendering somebody's tags. Each block is read separately
- * and joined with a space, because textContent alone runs the last word of one
- * paragraph into the first word of the next.
+ * because textContent alone runs the last word of one paragraph into the first
+ * word of the next.
  */
-export function plainText(html: string): string {
+export function plainText(html: string, between = ' '): string {
   const { body } = new DOMParser().parseFromString(html, 'text/html');
 
   const leaves = Array.from(body.querySelectorAll(blocks)).filter(
@@ -105,31 +106,72 @@ export function plainText(html: string): string {
   return leaves
     .map((block) => block.textContent?.trim() ?? '')
     .filter((text) => text !== '')
-    .join(' ');
+    .join(between);
 }
 
-/** The name to save an export under when the server did not name one. */
-function exportFilename(disposition: string | null): string {
-  const match = /filename="?([^";]+)"?/i.exec(disposition ?? '');
-
-  return match?.[1] ?? `slate-notes-${new Date().toISOString().slice(0, 10)}.json`;
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-/** Downloads every note the user owns as a file. */
-export async function exportNotes(): Promise<void> {
-  const response = await apiRequest('/api/notes/export');
-  const url = URL.createObjectURL(await response.blob());
-
-  // clicking a link is the only way a script can start a download
+// clicking a link is the only way a script can start a download
+function download(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
+
   link.href = url;
-  link.download = exportFilename(response.headers.get('Content-Disposition'));
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
 
   // the browser holds the blob until the url is released
   URL.revokeObjectURL(url);
+}
+
+/** The name to save an export under when the server did not name one. */
+function exportFilename(disposition: string | null): string {
+  const match = /filename="?([^";]+)"?/i.exec(disposition ?? '');
+
+  return match?.[1] ?? `slate-notes-${today()}.json`;
+}
+
+/** Downloads every note the user owns as a file that can be imported back. */
+export async function exportNotes(): Promise<void> {
+  const response = await apiRequest('/api/notes/export');
+
+  download(await response.blob(), exportFilename(response.headers.get('Content-Disposition')));
+}
+
+const rule = '-'.repeat(40);
+
+/**
+ * Every note as one readable document.
+ *
+ * A separate seam from the JSON export, and deliberately not something import
+ * reads back: plain text cannot carry bold, lists or headings, so a round trip
+ * through it would quietly flatten the note. This is a copy to read, print or
+ * paste elsewhere, and JSON stays the format that restores an account.
+ */
+export function notesToText(notes: Note[]): string {
+  return notes
+    .map((note) => {
+      const written = new Date(note.updatedAt).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      return `${rule}\n${note.title}\n${written}\n\n${plainText(note.content, '\n')}\n`;
+    })
+    .join('\n');
+}
+
+/** Downloads every note as a plain text file meant to be read, not imported. */
+export async function exportNotesAsText(): Promise<void> {
+  // no query, so this is every note rather than whatever the list is filtered to
+  const notes = await listNotes();
+
+  download(new Blob([notesToText(notes)], { type: 'text/plain' }), `slate-notes-${today()}.txt`);
 }
 
 // FileReader rather than file.text(), which jsdom does not implement, so the

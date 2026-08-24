@@ -243,11 +243,21 @@ started later wins, whichever comes back first.
 An empty result says something different depending on why it is empty. No notes at all
 is an invitation to write one; no notes matching a search is not.
 
-Export downloads the file the API builds, named by the `Content-Disposition` the server
-sets rather than a name picked again here. Import sends a chosen file straight back
-without reading it first - it is already JSON, the API checks it note by note, and a
-second set of rules in the browser would only be somewhere for the two to disagree. A
-file that is not JSON at all comes back as the API's own 400.
+There are two exports, and they are for different jobs.
+
+**Export JSON** downloads the file the API builds, named by the `Content-Disposition`
+the server sets rather than a name picked again here. This is the one import reads back.
+
+**Export text** downloads a `.txt` of every note, built in the browser from the notes it
+already has. It is a copy to read, print or paste elsewhere, and nothing loads it back:
+plain text cannot carry bold, lists or headings, so a round trip through it would
+quietly flatten every note. Keeping the two apart is what stops a backup silently
+becoming worse than the thing it backed up.
+
+Import sends a chosen file straight back without reading it first - it is already JSON,
+the API checks it note by note, and a second set of rules in the browser would only be
+somewhere for the two to disagree. A file that is not JSON at all comes back as the
+API's own 400.
 
 ### How the frontend knows who is signed in
 

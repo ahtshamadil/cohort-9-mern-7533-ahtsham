@@ -26,7 +26,7 @@ describe('LoginPage', () => {
     renderApp('/login');
     await logIn();
 
-    expect(await screen.findByText(/Signed in as/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
   });
 
   it('shows the error and stays put when the credentials are wrong', async () => {

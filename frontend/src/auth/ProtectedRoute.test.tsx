@@ -29,7 +29,7 @@ describe('ProtectedRoute', () => {
 
     renderApp('/');
 
-    expect(await screen.findByText(/Signed in as/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
   });
 
   it('renders nothing while the session check is still in flight', () => {
@@ -41,6 +41,6 @@ describe('ProtectedRoute', () => {
     // no log-in form. treating "not known yet" as "signed out" would flash this
     // screen at a signed-in user on every refresh
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Everything worth remembering' })).not.toBeInTheDocument();
   });
 });

@@ -107,7 +107,7 @@ describe('DashboardPage', () => {
 
     const alerts = await screen.findAllByRole('alert');
     expect(within(alerts[0]).getByText(/Could not log out/)).toBeInTheDocument();
-    expect(screen.getByText(/Signed in as/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
   });
 
   it('returns to the log-in screen after logging out', async () => {
@@ -209,9 +209,36 @@ describe('DashboardPage', () => {
     renderApp('/');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Export' }));
+    await user.click(await screen.findByRole('button', { name: 'Export JSON' }));
 
     await waitFor(() => expect(saved).toEqual(['slate-notes-2026-08-24.json']));
+  });
+
+  it('downloads a text copy built from every note', async () => {
+    stubApi({ ...signedIn, 'GET /api/notes': both });
+
+    const files: Blob[] = [];
+    URL.createObjectURL = jest.fn((blob: Blob) => {
+      files.push(blob);
+      return 'blob:slate';
+    });
+    URL.revokeObjectURL = jest.fn();
+
+    const saved: string[] = [];
+    jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        saved.push(this.download);
+      });
+
+    renderApp('/');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Export text' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]).toMatch(/^slate-notes-\d{4}-\d{2}-\d{2}\.txt$/);
+    expect(files[0].type).toBe('text/plain');
   });
 
   it('says how many notes an import brought in', async () => {
