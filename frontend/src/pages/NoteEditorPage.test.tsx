@@ -13,10 +13,19 @@ const note = {
   updatedAt: '2026-08-02T00:00:00.000Z',
 };
 
-/** What the stub was called with, for checking a request body. */
+/**
+ * What the stub was last called with, for checking a request body.
+ *
+ * The last rather than the first: editing restarts a one second autosave on
+ * every keystroke, so a slow enough machine lets one fire part way through
+ * typing. Reading the first call then asserts against that half-typed save
+ * instead of the one the test asked for.
+ */
 function bodyOf(key: string): unknown {
   const calls = (globalThis.fetch as jest.Mock).mock.calls;
-  const match = calls.find(([url, init]) => `${init?.method ?? 'GET'} ${String(url)}` === key);
+  const match = [...calls]
+    .reverse()
+    .find(([url, init]) => `${init?.method ?? 'GET'} ${String(url)}` === key);
 
   return JSON.parse(String(match?.[1]?.body));
 }
