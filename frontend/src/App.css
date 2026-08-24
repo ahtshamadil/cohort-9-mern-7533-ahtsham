@@ -14,6 +14,14 @@
   color: var(--ink-subtle);
 }
 
+/* index.css draws a marigold swipe behind every <a>, which is right for a link
+   inside a sentence and wrong for one that is a whole surface: on a card it
+   lands at 88% of the height, straight through the date, and grows on hover */
+.note-card,
+.button {
+  background-image: none;
+}
+
 /* off the screen but still read aloud, for a label that would be noise on screen
    and a missing name to a screen reader */
 .visually-hidden {
@@ -453,9 +461,41 @@
 }
 
 .app-header-actions {
+  /* every control in the header is one height, so the row reads as a row. the
+     theme toggle set it at 2.25rem and .button never followed, which only
+     showed once the avatar tile stopped standing between them */
+  --control: 2.25rem;
+
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+}
+
+.app-header-actions .button {
+  height: var(--control);
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+}
+
+.app-user {
+  /* inline-block rather than flex: ellipsis does not apply to the anonymous
+     text of a flex container, and the name is the thing being truncated */
+  display: inline-block;
+  max-width: 14rem;
+  height: var(--control);
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  /* the borders are inside the height, so the text still sits on the centre */
+  line-height: calc(var(--control) - 2px);
+  color: var(--ink-muted);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  /* a long name would otherwise push Log out off a narrow header */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .app-main {
@@ -472,16 +512,6 @@
 
 .page-heading h1 {
   margin: 0.375rem 0 0.375rem;
-}
-
-.app-user {
-  font-size: 0.875rem;
-  color: var(--ink-muted);
-  /* a long name pushes Log out off a narrow header without this */
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .empty-state {
@@ -527,12 +557,22 @@
 }
 
 .notes-bar {
+  /* one height for every control on the line. the inputs and the buttons had
+     their own padding before, so nothing on the row shared an edge */
+  --control: 2.625rem;
+
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.5rem;
   margin-bottom: 1.25rem;
+}
+
+.notes-bar .button,
+.notes-search,
+.notes-sort {
+  height: var(--control);
 }
 
 .notes-filters {
@@ -554,9 +594,13 @@
   width: auto;
 }
 
+.notes-bar .button {
+  padding: 0 1rem;
+}
+
 .notes-search,
 .notes-sort {
-  padding: 0.6875rem 0.875rem;
+  padding: 0 0.875rem;
   font: inherit;
   color: var(--ink);
   background-color: var(--surface);
@@ -583,6 +627,79 @@
   background-color: var(--surface-raised);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--marker);
+}
+
+/* the native arrow is drawn by the platform and matches nothing else here, so
+   it is replaced with the same chevron the export button uses */
+.notes-sort {
+  appearance: none;
+  padding-right: 2.25rem;
+  /* a data uri cannot read a custom property, so ink-muted is written out
+     for each theme rather than the arrow being left a different colour
+     from the chevron on the export button beside it */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6469' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8125rem center;
+  background-size: 0.75rem;
+}
+
+:root[data-theme='dark'] .notes-sort {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a2a8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ---------- menus ---------- */
+
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+/* taken out of the flow so opening the menu does not push the toolbar around,
+   and above the note cards, which would otherwise draw over it */
+.menu-list {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 15rem;
+  padding: 0.25rem;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background-color: var(--surface-hover);
+}
+
+.menu-item-label {
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+
+/* the sentence that says which file this is for, which there is no room for on
+   the button itself */
+.menu-item-hint {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
 }
 
 .notes-notice {
