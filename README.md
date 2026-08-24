@@ -224,9 +224,30 @@ Inside `frontend/src`:
 | `/login` | Log in | Anyone |
 | `/register` | Sign up | Anyone |
 | `/` | Dashboard | Signed-in users only |
+| `/notes/new` | A blank note | Signed-in users only |
+| `/notes/:id` | One note | Signed-in users only |
 
 Registering signs you in straight away, so there is no second trip through the
 log-in form.
+
+### Finding a note, and taking them with you
+
+The dashboard toolbar holds the search box, the sort order, and the two file buttons.
+
+Searching waits 300ms after the last keystroke before asking, so a five-letter word is
+one request rather than five. What is in the box and what has actually been asked for
+are kept apart, which is what lets the input stay responsive while a slower search is
+still out. Answers arriving out of order are dropped rather than drawn - a search
+started later wins, whichever comes back first.
+
+An empty result says something different depending on why it is empty. No notes at all
+is an invitation to write one; no notes matching a search is not.
+
+Export downloads the file the API builds, named by the `Content-Disposition` the server
+sets rather than a name picked again here. Import sends a chosen file straight back
+without reading it first - it is already JSON, the API checks it note by note, and a
+second set of rules in the browser would only be somewhere for the two to disagree. A
+file that is not JSON at all comes back as the API's own 400.
 
 ### How the frontend knows who is signed in
 
