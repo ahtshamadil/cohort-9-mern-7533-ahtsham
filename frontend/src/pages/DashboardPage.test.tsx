@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp, restoreFetch, stubApi, testUser } from '../test/harness';
@@ -13,8 +13,21 @@ const note = {
   updatedAt: '2026-08-02T00:00:00.000Z',
 };
 
+const other = {
+  id: 2,
+  title: 'Ideas',
+  content: '<p>A better mousetrap</p>',
+  createdAt: '2026-08-03T00:00:00.000Z',
+  updatedAt: '2026-08-04T00:00:00.000Z',
+};
+
+const both = { status: 200, body: { notes: [note, other] } };
+
 describe('DashboardPage', () => {
-  afterEach(restoreFetch);
+  afterEach(() => {
+    restoreFetch();
+    jest.restoreAllMocks();
+  });
 
   it('lists the notes it gets back', async () => {
     stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note] } } });
@@ -110,5 +123,135 @@ describe('DashboardPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Log out' }));
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+  });
+
+  it('searches for what was typed', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'GET /api/notes?q=milk': { status: 200, body: { notes: [note] } },
+    });
+
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Ideas' });
+
+    // pasted rather than typed, so the debounce sees one change and the stub is
+    // not asked for every prefix of the word
+    await user.click(screen.getByLabelText('Search notes'));
+    await user.paste('milk');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Ideas' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('heading', { name: 'Shopping' })).toBeInTheDocument();
+  });
+
+  it('says so when a search matches nothing', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'GET /api/notes?q=zzz': { status: 200, body: { notes: [] } },
+    });
+
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Ideas' });
+
+    await user.click(screen.getByLabelText('Search notes'));
+    await user.paste('zzz');
+
+    // a clean slate would be wrong here - the account is not empty, the search missed
+    expect(await screen.findByRole('heading', { name: 'Nothing matches' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'A clean slate' })).not.toBeInTheDocument();
+  });
+
+  it('asks for a different order when one is chosen', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'GET /api/notes?sort=title': { status: 200, body: { notes: [other] } },
+    });
+
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Shopping' });
+
+    await user.selectOptions(screen.getByLabelText('Sort notes'), 'title');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Shopping' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('downloads an export under the name the server gave it', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'GET /api/notes/export': {
+        status: 200,
+        body: { version: 1, notes: [] },
+        headers: { 'Content-Disposition': 'attachment; filename="slate-notes-2026-08-24.json"' },
+      },
+    });
+
+    // jsdom implements neither, and the download is the only thing that uses them
+    URL.createObjectURL = jest.fn(() => 'blob:slate');
+    URL.revokeObjectURL = jest.fn();
+
+    const saved: string[] = [];
+    jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        saved.push(this.download);
+      });
+
+    renderApp('/');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Export' }));
+
+    await waitFor(() => expect(saved).toEqual(['slate-notes-2026-08-24.json']));
+  });
+
+  it('says how many notes an import brought in', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'POST /api/notes/import': { status: 201, body: { imported: 2 } },
+    });
+
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Ideas' });
+
+    const file = new File([JSON.stringify({ version: 1, notes: [] })], 'slate-notes.json', {
+      type: 'application/json',
+    });
+
+    await user.upload(screen.getByLabelText('Import'), file);
+
+    expect(await screen.findByText('Imported 2 notes.')).toBeInTheDocument();
+  });
+
+  it('reports what the API objected to in an import file', async () => {
+    stubApi({
+      ...signedIn,
+      'GET /api/notes': both,
+      'POST /api/notes/import': {
+        status: 400,
+        body: { error: { message: 'Unsupported export version' } },
+      },
+    });
+
+    renderApp('/');
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Ideas' });
+
+    const file = new File(['{"version":2,"notes":[]}'], 'old.json', { type: 'application/json' });
+    await user.upload(screen.getByLabelText('Import'), file);
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(within(alerts[0]).getByText(/Unsupported export version/)).toBeInTheDocument();
   });
 });

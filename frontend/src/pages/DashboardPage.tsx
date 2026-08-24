@@ -1,10 +1,28 @@
 import { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { listNotes, plainText, type Note } from '../api/notes';
+import {
+  exportNotes,
+  importNotes,
+  listNotes,
+  plainText,
+  type Note,
+  type NoteSort,
+} from '../api/notes';
 import { useAuth } from '../auth/useAuth';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
+
+/** How long to wait after the last keystroke before searching. */
+const searchDelayMs = 300;
+
+const sortOptions: { value: NoteSort; label: string }[] = [
+  { value: 'recent', label: 'Recently changed' },
+  { value: 'oldest', label: 'Least recently changed' },
+  { value: 'created', label: 'Newest first' },
+  { value: 'title', label: 'Title A to Z' },
+];
 
 /** The first letter of whatever we can call this person, for the avatar. */
 function initial(from: string): string {
@@ -20,30 +38,55 @@ function changed(at: string): string {
   });
 }
 
+/** How many notes, worded so a screen reader is not read "1 notes". */
+function counted(total: number): string {
+  return `${total} ${total === 1 ? 'note' : 'notes'}`;
+}
+
 /** The signed-in landing screen: everything this person has written. */
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  // what is in the box, and what has actually been asked for
+  const [search, setSearch] = useState('');
+  const [term, setTerm] = useState('');
+  const [sort, setSort] = useState<NoteSort>('recent');
+  const [reloads, setReloads] = useState(0);
+
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // searching on every keystroke would be a request per letter. each one restarts
+  // the timer, so only the last of a burst is ever asked for
+  useEffect(() => {
+    const timer = setTimeout(() => setTerm(search), searchDelayMs);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     let cancelled = false;
 
-    listNotes()
+    listNotes({ q: term, sort })
       .then((found) => {
-        if (!cancelled) setNotes(found);
+        if (cancelled) return;
+
+        setNotes(found);
+        setError(null);
       })
       .catch((cause: Error) => {
         if (!cancelled) setError(cause.message);
       });
 
+    // searches started later win, whichever answer comes back first
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [term, sort, reloads]);
 
   /** Ends the session and leaves, or reports why it could not. */
   async function handleLogout() {
@@ -60,7 +103,51 @@ export function DashboardPage() {
     }
   }
 
+  /** Saves every note to a file, or says why it could not. */
+  async function handleExport() {
+    setBusy(true);
+    setNotice(null);
+
+    try {
+      await exportNotes();
+      setNotice({ text: 'Your notes have been downloaded.', failed: false });
+    } catch (cause) {
+      const because = cause instanceof Error ? cause.message : 'something went wrong';
+      setNotice({ text: `Could not export your notes: ${because}`, failed: true });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Loads a chosen export file and shows the list again with it in. */
+  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    // picking the same file twice fires no change event unless the input is cleared
+    event.target.value = '';
+
+    if (file === undefined) {
+      return;
+    }
+
+    setBusy(true);
+    setNotice(null);
+
+    try {
+      const imported = await importNotes(file);
+
+      setNotice({ text: `Imported ${counted(imported)}.`, failed: false });
+      setReloads((count) => count + 1);
+    } catch (cause) {
+      const because = cause instanceof Error ? cause.message : 'the file could not be read';
+      setNotice({ text: `Could not import that file: ${because}`, failed: true });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const displayName = user?.name ?? user?.email ?? '';
+  const searching = term !== '';
 
   return (
     <div className="app-shell">
@@ -92,10 +179,74 @@ export function DashboardPage() {
         </div>
 
         <div className="notes-bar">
-          <Link className="button" to="/notes/new">
-            New note
-          </Link>
+          <div className="notes-filters">
+            <label className="visually-hidden" htmlFor="notes-search">
+              Search notes
+            </label>
+            <input
+              id="notes-search"
+              type="search"
+              className="notes-search"
+              placeholder="Search your notes"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+
+            <label className="visually-hidden" htmlFor="notes-sort">
+              Sort notes
+            </label>
+            <select
+              id="notes-sort"
+              className="notes-sort"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as NoteSort)}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="notes-actions">
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={busy}
+              onClick={() => void handleExport()}
+            >
+              Export
+            </button>
+
+            {/* a label rather than a button reaching for a hidden input, so the
+                control announced is the file input itself */}
+            <label className="button button-ghost" htmlFor="notes-import">
+              Import
+            </label>
+            <input
+              id="notes-import"
+              type="file"
+              accept="application/json,.json"
+              className="visually-hidden"
+              disabled={busy}
+              onChange={(event) => void handleImport(event)}
+            />
+
+            <Link className="button" to="/notes/new">
+              New note
+            </Link>
+          </div>
         </div>
+
+        {notice !== null && (
+          <p
+            className={notice.failed ? 'form-error' : 'notes-notice'}
+            role={notice.failed ? 'alert' : 'status'}
+          >
+            {notice.text}
+          </p>
+        )}
 
         {error !== null && (
           <p className="form-error" role="alert">
@@ -103,10 +254,23 @@ export function DashboardPage() {
           </p>
         )}
 
-        {notes !== null && notes.length === 0 && (
+        {/* the list changes without anything being clicked, so the count is
+            announced rather than left to be noticed */}
+        <p className="visually-hidden" role="status">
+          {notes === null ? '' : counted(notes.length)}
+        </p>
+
+        {notes !== null && notes.length === 0 && !searching && (
           <div className="empty-state">
             <h2>A clean slate</h2>
             <p>Nothing written yet. Start with a new note.</p>
+          </div>
+        )}
+
+        {notes !== null && notes.length === 0 && searching && (
+          <div className="empty-state">
+            <h2>Nothing matches</h2>
+            <p>No note has &quot;{term}&quot; in its title or its text.</p>
           </div>
         )}
 

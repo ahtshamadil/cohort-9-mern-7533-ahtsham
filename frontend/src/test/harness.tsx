@@ -8,6 +8,8 @@ import { ThemeProvider } from '../theme/ThemeProvider';
 export interface StubbedResponse {
   status: number;
   body?: unknown;
+  /** Response headers the caller reads, such as Content-Disposition. */
+  headers?: Record<string, string>;
   /** Held back this long before answering, to line up races on purpose. */
   delayMs?: number;
   /** Rejects the way fetch does when it cannot reach the server at all. */
@@ -52,7 +54,13 @@ export function stubApi(routes: Record<string, StubbedResponse>): void {
       ok: match.status >= 200 && match.status < 300,
       status: match.status,
       json: () => Promise.resolve(match.body ?? null),
-    } as Response;
+      blob: () =>
+        Promise.resolve(
+          new Blob([JSON.stringify(match.body ?? null)], { type: 'application/json' }),
+        ),
+      // jsdom ships no Headers, so get() is the one method worth standing in for
+      headers: { get: (name: string) => match.headers?.[name] ?? null },
+    } as unknown as Response;
 
     if (match.delayMs === undefined) {
       return Promise.resolve(answer);
