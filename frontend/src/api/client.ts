@@ -27,37 +27,50 @@ export class ApiError extends Error {
   }
 }
 
+/** Reads whatever the API said about a failure and wraps it in an ApiError. */
+async function failure(response: Response): Promise<ApiError> {
+  // a proxy failure or a crash can answer with html, so a body that will not
+  // parse is treated as no body rather than being allowed to throw here
+  const body: unknown = await response.json().catch(() => null);
+  const envelope = (body ?? {}) as ErrorEnvelope;
+
+  return new ApiError(
+    response.status,
+    envelope.error?.message ?? `Request failed with status ${response.status}`,
+    envelope.error?.details ?? [],
+  );
+}
+
 /**
- * Calls the API and returns the parsed body, throwing an ApiError if the
- * response was not a success.
+ * Calls the API and hands back the response itself, throwing an ApiError if it
+ * failed. The export download wants the bytes rather than a parsed body.
  *
  * No credentials option is set. Vite proxies /api to the backend, so these are
  * same-origin requests and fetch already sends the session cookie with them.
  */
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
   });
+
+  if (!response.ok) {
+    throw await failure(response);
+  }
+
+  return response;
+}
+
+/** Calls the API and returns the parsed body. */
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await apiRequest(path, options);
 
   // logout answers 204, which has no body to parse
   if (response.status === 204) {
     return undefined as T;
   }
 
-  // a proxy failure or a crash can answer with html, so a body that will not
-  // parse is treated as no body rather than being allowed to throw here
   const body: unknown = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const envelope = (body ?? {}) as ErrorEnvelope;
-
-    throw new ApiError(
-      response.status,
-      envelope.error?.message ?? `Request failed with status ${response.status}`,
-      envelope.error?.details ?? [],
-    );
-  }
 
   return body as T;
 }
