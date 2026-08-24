@@ -45,6 +45,11 @@ async function failure(response: Response): Promise<ApiError> {
  * Calls the API and hands back the response itself, throwing an ApiError if it
  * failed. The export download wants the bytes rather than a parsed body.
  *
+ * An ApiError means the server answered and refused. A server that could not be
+ * reached at all is fetch's own TypeError, deliberately left to propagate as
+ * itself - callers tell the two apart, and the screens say something different
+ * for a request that never arrived than for one that came back rejected.
+ *
  * No credentials option is set. Vite proxies /api to the backend, so these are
  * same-origin requests and fetch already sends the session cookie with them.
  */
