@@ -30,13 +30,13 @@ describe('AuthProvider', () => {
     await user.type(screen.getByLabelText('Password'), 'correct horse battery');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText(/Signed in as/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
 
     // outlast the bootstrap request, then check we were not thrown back out
     await new Promise((resolve) => setTimeout(resolve, 1800));
 
     await waitFor(() => {
-      expect(screen.getByText(/Signed in as/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
     });
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument();
   });

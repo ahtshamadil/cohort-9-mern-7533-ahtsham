@@ -1,7 +1,14 @@
 // adds matchers like toBeInTheDocument() to expect()
 import '@testing-library/jest-dom';
 
+import { configure } from '@testing-library/react';
 import { TextDecoder, TextEncoder } from 'node:util';
+
+// findBy* and waitFor give up after 1s by default, which is not much once jest
+// is running several suites at once on a busy machine and a screen waits on a
+// debounce before it even asks. the failures that caused looked like real bugs
+// and moved between files from one run to the next.
+configure({ asyncUtilTimeout: 5000 });
 
 // jest's jsdom environment leaves TextEncoder and TextDecoder off the globals
 // even though node itself has had them for years. react-router reaches for

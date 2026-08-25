@@ -25,7 +25,7 @@ describe('RegisterPage', () => {
     await signUp();
 
     // registering signs you in, so there is no second trip through the log-in form
-    expect(await screen.findByText(/Signed in as/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Everything worth remembering' })).toBeInTheDocument();
   });
 
   it('reports an address that is already taken', async () => {
