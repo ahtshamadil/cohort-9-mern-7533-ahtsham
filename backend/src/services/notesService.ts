@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
 import { prisma } from '../db/prisma.js';
+import { userSummaryFields, type UserSummary } from './authService.js';
 import { htmlToText } from '../utils/html.js';
 import { HttpError } from '../utils/httpError.js';
 import { logger } from '../utils/logger.js';
 import { parseOrThrow } from '../utils/validation.js';
+
+/** What a share grants the account it was given to. */
+export type SharePermission = 'view' | 'edit';
+
+/** What the account asking may do with a note. Owning it outranks any share. */
+export type NotePermission = 'owner' | SharePermission;
 
 /** A note as the client sees it. */
 export interface Note {
@@ -13,6 +20,8 @@ export interface Note {
   content: string;
   createdAt: Date;
   updatedAt: Date;
+  owner: UserSummary;
+  permission: NotePermission;
 }
 
 /** A note as it appears in an export file. */
@@ -94,13 +103,56 @@ export const importSchema = z.object({
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
 
-const noteFields = {
-  id: true,
-  title: true,
-  content: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
+// the reader's own share is selected alongside the note so the permission comes
+// back with it rather than costing a second query per note
+function noteFields(userId: number) {
+  return {
+    id: true,
+    title: true,
+    content: true,
+    createdAt: true,
+    updatedAt: true,
+    authorId: true,
+    author: { select: userSummaryFields },
+    shares: { where: { userId }, select: { permission: true } },
+  } as const;
+}
+
+interface NoteRow {
+  id: number;
+  title: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+  authorId: number;
+  author: UserSummary;
+  shares: { permission: SharePermission }[];
+}
+
+/** A stored row as the client sees it, carrying what this reader may do to it. */
+function toNote(row: NoteRow, userId: number): Note {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    owner: row.author,
+    permission: row.authorId === userId ? 'owner' : (row.shares[0]?.permission ?? 'view'),
+  };
+}
+
+// what a user may read: their own notes, plus anything shared with them
+function readable(userId: number) {
+  return { OR: [{ authorId: userId }, { shares: { some: { userId } } }] };
+}
+
+// the same, narrowed to the shares that granted editing
+function writable(userId: number) {
+  return {
+    OR: [{ authorId: userId }, { shares: { some: { userId, permission: 'edit' as const } } }],
+  };
+}
 
 const exportFields = {
   title: true,
@@ -124,33 +176,40 @@ function searchTerm(q: string): string {
   return q.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
-/** Lists a user's notes, filtered by the search term and in the order asked for. */
-export async function listNotes(authorId: number, query: unknown = {}): Promise<Note[]> {
+/** Lists a user's own notes, filtered by the search term and in the order asked for. */
+export async function listNotes(userId: number, query: unknown = {}): Promise<Note[]> {
   const { q, sort } = parseOrThrow(listNotesSchema, query);
   const term = q === undefined ? undefined : searchTerm(q);
 
-  return prisma.note.findMany({
+  const rows = await prisma.note.findMany({
     where: {
-      authorId,
+      authorId: userId,
       // title or body, because someone searching for a word does not know which it is in
       ...(term === undefined
         ? {}
-        : { OR: [{ title: { contains: term } }, { contentText: { contains: term } }] }),
+        : {
+            OR: [{ title: { contains: term } }, { contentText: { contains: term } }],
+          }),
     },
     orderBy: ordering[sort],
-    select: noteFields,
+    select: noteFields(userId),
   });
+
+  return rows.map((row) => toNote(row, userId));
 }
 
-/** Returns one of the user's notes, or throws 404. */
-export async function getNote(authorId: number, id: number): Promise<Note> {
-  const note = await prisma.note.findFirst({ where: { id, authorId }, select: noteFields });
+/** Returns a note the user owns or has been shared, or throws 404. */
+export async function getNote(userId: number, id: number): Promise<Note> {
+  const note = await prisma.note.findFirst({
+    where: { id, ...readable(userId) },
+    select: noteFields(userId),
+  });
 
   if (note === null) {
     throw new HttpError(404, notFound);
   }
 
-  return note;
+  return toNote(note, userId);
 }
 
 /** Creates a note owned by the user. */
@@ -159,25 +218,26 @@ export async function createNote(authorId: number, input: CreateNoteInput): Prom
 
   const note = await prisma.note.create({
     data: { ...data, contentText: htmlToText(data.content), authorId },
-    select: noteFields,
+    select: noteFields(authorId),
   });
 
   logger.info({ userId: authorId, noteId: note.id }, 'Note created');
 
-  return note;
+  return toNote(note, authorId);
 }
 
-/** Changes the given fields of a note, or throws 404. */
+/** Changes the given fields of a note the user may write, or throws 404. */
 export async function updateNote(
-  authorId: number,
+  userId: number,
   id: number,
   input: UpdateNoteInput,
 ): Promise<Note> {
   const data = parseOrThrow(updateNoteSchema, input);
 
-  // the authorId in the where clause is what stops one user editing another's note
+  // the permission is part of the write rather than a read then a write, so a
+  // share cannot be revoked in the gap between checking it and using it
   const { count } = await prisma.note.updateMany({
-    where: { id, authorId },
+    where: { id, ...writable(userId) },
     data: {
       ...data,
       ...(data.content === undefined ? {} : { contentText: htmlToText(data.content) }),
@@ -188,20 +248,25 @@ export async function updateNote(
     throw new HttpError(404, notFound);
   }
 
-  logger.info({ userId: authorId, noteId: id }, 'Note updated');
+  logger.info({ userId, noteId: id }, 'Note updated');
 
-  return getNote(authorId, id);
+  return getNote(userId, id);
 }
 
-/** Deletes a note, or throws 404. */
-export async function deleteNote(authorId: number, id: number): Promise<void> {
-  const { count } = await prisma.note.deleteMany({ where: { id, authorId } });
+/**
+ * Deletes a note, or throws 404.
+ *
+ * Owner only. Editing somebody's note is not the same right as destroying it, so
+ * this keeps the plain authorId check the other writes have outgrown.
+ */
+export async function deleteNote(userId: number, id: number): Promise<void> {
+  const { count } = await prisma.note.deleteMany({ where: { id, authorId: userId } });
 
   if (count === 0) {
     throw new HttpError(404, notFound);
   }
 
-  logger.info({ userId: authorId, noteId: id }, 'Note deleted');
+  logger.info({ userId, noteId: id }, 'Note deleted');
 }
 
 /**
