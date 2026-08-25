@@ -588,6 +588,10 @@ describe('notes', function () {
         request(app).delete('/api/notes/1'),
         request(app).get('/api/notes/export'),
         request(app).post('/api/notes/import').send({ version: 1, notes: [] }),
+        request(app).get('/api/notes/shared'),
+        request(app).get('/api/notes/1/shares'),
+        request(app).post('/api/notes/1/shares').send({ email: 'someone@example.com' }),
+        request(app).delete('/api/notes/1/shares/2'),
       ]);
 
       for (const response of responses) {

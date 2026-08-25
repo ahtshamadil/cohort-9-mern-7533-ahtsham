@@ -11,9 +11,15 @@ import {
   getNote,
   importNotes,
   listNotes,
+  listShares,
+  listSharedNotes,
+  shareNote,
+  shareNoteSchema,
+  unshareNote,
   updateNote,
   updateNoteSchema,
   type CreateNoteInput,
+  type ShareNoteInput,
   type UpdateNoteInput,
 } from '../services/notesService.js';
 import { HttpError } from '../utils/httpError.js';
@@ -23,14 +29,18 @@ export const notesRouter = Router();
 
 notesRouter.use(requireAuth);
 
-function noteId(value: string | string[]): number {
+function wholeNumber(value: string | string[], what: string): number {
   const id = typeof value === 'string' ? Number(value) : NaN;
 
   if (!Number.isInteger(id) || id < 1) {
-    throw new HttpError(400, 'Note id must be a positive whole number');
+    throw new HttpError(400, `${what} must be a positive whole number`);
   }
 
   return id;
+}
+
+function noteId(value: string | string[]): number {
+  return wholeNumber(value, 'Note id');
 }
 
 notesRouter.get('/', async (req, res) => {
@@ -46,7 +56,7 @@ notesRouter.post('/', validateBody(createNoteSchema), async (req, res) => {
   res.status(201).json({ note });
 });
 
-// both of these have to sit above /:id, which would otherwise read the word as an id
+// these three have to sit above /:id, which would otherwise read the word as an id
 notesRouter.get('/export', async (req, res) => {
   const authorId = currentUserId(req);
   const today = new Date().toISOString().slice(0, 10);
@@ -75,6 +85,12 @@ notesRouter.post('/import', async (req, res) => {
   res.status(201).json({ imported });
 });
 
+notesRouter.get('/shared', async (req, res) => {
+  const notes = await listSharedNotes(currentUserId(req), req.query);
+
+  res.json({ notes });
+});
+
 notesRouter.get('/:id', async (req, res) => {
   const note = await getNote(currentUserId(req), noteId(req.params.id));
 
@@ -90,6 +106,30 @@ notesRouter.patch('/:id', validateBody(updateNoteSchema), async (req, res) => {
 
 notesRouter.delete('/:id', async (req, res) => {
   await deleteNote(currentUserId(req), noteId(req.params.id));
+
+  res.status(204).send();
+});
+
+notesRouter.get('/:id/shares', async (req, res) => {
+  const shares = await listShares(currentUserId(req), noteId(req.params.id));
+
+  res.json({ shares });
+});
+
+notesRouter.post('/:id/shares', validateBody(shareNoteSchema), async (req, res) => {
+  const body: ShareNoteInput = req.body;
+  const { share, created } = await shareNote(currentUserId(req), noteId(req.params.id), body);
+
+  // 201 says a new share was made, 200 that an existing one now grants something else
+  res.status(created ? 201 : 200).json({ share });
+});
+
+notesRouter.delete('/:id/shares/:userId', async (req, res) => {
+  await unshareNote(
+    currentUserId(req),
+    noteId(req.params.id),
+    wholeNumber(req.params.userId, 'User id'),
+  );
 
   res.status(204).send();
 });

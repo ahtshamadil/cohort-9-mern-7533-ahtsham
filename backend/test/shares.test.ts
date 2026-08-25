@@ -395,4 +395,135 @@ describe('shares', function () {
       expect(error).to.include({ statusCode: 404 });
     });
   });
+
+  describe('the sharing routes', () => {
+    it('shares a note and answers 201, then 200 when it changes', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const made = await mine
+        .post(`/api/notes/${id}/shares`)
+        .send({ email: 'someone@example.com', permission: 'view' });
+      const changed = await mine
+        .post(`/api/notes/${id}/shares`)
+        .send({ email: 'someone@example.com', permission: 'edit' });
+
+      expect(made.status).to.equal(201);
+      expect(made.body.share.permission).to.equal('view');
+      expect(changed.status).to.equal(200);
+      expect(changed.body.share.permission).to.equal('edit');
+      expect(await prisma.noteShare.count()).to.equal(1);
+    });
+
+    it('defaults a share with no permission to viewing', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const response = await mine
+        .post(`/api/notes/${id}/shares`)
+        .send({ email: 'someone@example.com' });
+
+      expect(response.status).to.equal(201);
+      expect(response.body.share.permission).to.equal('view');
+    });
+
+    it('rejects a permission that is not one of the two', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const response = await mine
+        .post(`/api/notes/${id}/shares`)
+        .send({ email: 'someone@example.com', permission: 'owner' });
+
+      expect(response.status).to.equal(400);
+      expect(response.body.error.details[0].field).to.equal('permission');
+    });
+
+    it('rejects a body with no address in it', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const response = await mine.post(`/api/notes/${id}/shares`).send({ permission: 'edit' });
+
+      expect(response.status).to.equal(400);
+      expect(response.body.error.details[0].field).to.equal('email');
+    });
+
+    it('lists who a note is shared with', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+      await share(id, 'someone@example.com', 'edit');
+
+      const response = await mine.get(`/api/notes/${id}/shares`);
+
+      expect(response.status).to.equal(200);
+      expect(response.body.shares).to.have.length(1);
+      expect(response.body.shares[0].user.email).to.equal('someone@example.com');
+      expect(response.body.shares[0].user).to.not.have.property('passwordHash');
+    });
+
+    it('answers the shared list with what other people gave you', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      const theirs = await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Shared');
+      await share(id, 'someone@example.com', 'view');
+
+      const response = await theirs.get('/api/notes/shared');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.notes).to.have.length(1);
+      expect(response.body.notes[0].title).to.equal('Shared');
+      expect(response.body.notes[0].permission).to.equal('view');
+    });
+
+    it('does not read the word shared as a note id', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await createNote(mine, 'Mine');
+
+      const response = await mine.get('/api/notes/shared');
+
+      expect(response.status).to.equal(200);
+      expect(response.body).to.have.property('notes');
+    });
+
+    it('unshares a note and answers 204', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+      await share(id, 'someone@example.com', 'edit');
+      const reader = await userId('someone@example.com');
+
+      const response = await mine.delete(`/api/notes/${id}/shares/${reader}`);
+
+      expect(response.status).to.equal(204);
+      expect(await prisma.noteShare.count()).to.equal(0);
+    });
+
+    it('rejects a user id that is not a number', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const response = await mine.delete(`/api/notes/${id}/shares/nobody`);
+
+      expect(response.status).to.equal(400);
+      expect(response.body.error.message).to.contain('User id');
+    });
+
+    it('says not found when the note is not yours to share', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      const theirs = await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Mine');
+
+      const response = await theirs
+        .post(`/api/notes/${id}/shares`)
+        .send({ email: 'someone@example.com', permission: 'edit' });
+
+      expect(response.status).to.equal(404);
+      expect(await prisma.noteShare.count()).to.equal(0);
+    });
+  });
 });
