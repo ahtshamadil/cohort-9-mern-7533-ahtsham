@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { prisma } from '../db/prisma.js';
-import { userSummaryFields, type UserSummary } from './authService.js';
+import { findUserByEmail, userSummaryFields, type UserSummary } from './authService.js';
 import { htmlToText } from '../utils/html.js';
 import { HttpError } from '../utils/httpError.js';
 import { logger } from '../utils/logger.js';
@@ -22,6 +22,13 @@ export interface Note {
   updatedAt: Date;
   owner: UserSummary;
   permission: NotePermission;
+}
+
+/** A share of one note with one account, as the owner sees it listed. */
+export interface Share {
+  user: UserSummary;
+  permission: SharePermission;
+  createdAt: Date;
 }
 
 /** A note as it appears in an export file. */
@@ -73,6 +80,12 @@ export const updateNoteSchema = z
     'Give a title or content to change',
   );
 
+/** What sharing a note accepts. The route validates against this too. */
+export const shareNoteSchema = z.object({
+  email: z.email('Enter a valid email address'),
+  permission: z.enum(['view', 'edit']).default('view'),
+});
+
 /** What the list route accepts as a query string. */
 export const listNotesSchema = z.object({
   // a cleared search box sends q=, which means no search rather than no results
@@ -102,6 +115,7 @@ export const importSchema = z.object({
 
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
+export type ShareNoteInput = z.infer<typeof shareNoteSchema>;
 
 // the reader's own share is selected alongside the note so the permission comes
 // back with it rather than costing a second query per note
@@ -267,6 +281,100 @@ export async function deleteNote(userId: number, id: number): Promise<void> {
   }
 
   logger.info({ userId, noteId: id }, 'Note deleted');
+}
+
+const shareFields = {
+  user: { select: userSummaryFields },
+  permission: true,
+  createdAt: true,
+} as const;
+
+const shareNotFound = 'Share not found';
+
+/** Throws 404 unless the note exists and this user owns it. */
+async function ownedOrThrow(userId: number, id: number): Promise<void> {
+  const note = await prisma.note.findFirst({
+    where: { id, authorId: userId },
+    select: { id: true },
+  });
+
+  if (note === null) {
+    throw new HttpError(404, notFound);
+  }
+}
+
+/** Who a note the user owns has been shared with. */
+export async function listShares(userId: number, id: number): Promise<Share[]> {
+  await ownedOrThrow(userId, id);
+
+  return prisma.noteShare.findMany({
+    where: { noteId: id },
+    orderBy: { createdAt: 'asc' },
+    select: shareFields,
+  });
+}
+
+/**
+ * Shares a note with another account, or changes what an existing share grants.
+ *
+ * `created` is false when the share was already there, which is the difference
+ * between answering 201 and 200. The lookup that decides it is only for that -
+ * the upsert below is what makes two people sharing at once safe.
+ */
+export async function shareNote(
+  userId: number,
+  id: number,
+  input: ShareNoteInput,
+): Promise<{ share: Share; created: boolean }> {
+  const { email, permission } = parseOrThrow(shareNoteSchema, input);
+
+  await ownedOrThrow(userId, id);
+
+  const recipient = await findUserByEmail(email);
+
+  if (recipient === null) {
+    throw new HttpError(404, 'No account with that email');
+  }
+
+  if (recipient.id === userId) {
+    throw new HttpError(400, 'You already own this note');
+  }
+
+  const key = { noteId_userId: { noteId: id, userId: recipient.id } };
+  const existing = await prisma.noteShare.findUnique({ where: key, select: { id: true } });
+
+  const share = await prisma.noteShare.upsert({
+    where: key,
+    create: { noteId: id, userId: recipient.id, permission },
+    update: { permission },
+    select: shareFields,
+  });
+
+  logger.info({ userId, noteId: id, targetUserId: recipient.id, permission }, 'Note shared');
+
+  return { share, created: existing === null };
+}
+
+/** Removes a share. The owner may take it back, and the reader may drop it. */
+export async function unshareNote(
+  userId: number,
+  id: number,
+  targetUserId: number,
+): Promise<void> {
+  // giving a note back does not need the owner's permission
+  if (targetUserId !== userId) {
+    await ownedOrThrow(userId, id);
+  }
+
+  const { count } = await prisma.noteShare.deleteMany({
+    where: { noteId: id, userId: targetUserId },
+  });
+
+  if (count === 0) {
+    throw new HttpError(404, shareNotFound);
+  }
+
+  logger.info({ userId, noteId: id, targetUserId }, 'Share removed');
 }
 
 /**
