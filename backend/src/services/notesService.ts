@@ -5,6 +5,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { htmlToText } from '../utils/html.js';
 import { HttpError } from '../utils/httpError.js';
 import { logger } from '../utils/logger.js';
+import { sanitiseHtml } from '../utils/sanitiseHtml.js';
 import { parseOrThrow } from '../utils/validation.js';
 import { findUserByEmail, userSummaryFields, type UserSummary } from './authService.js';
 
@@ -63,9 +64,12 @@ const title = z
   .min(1, 'Title is required')
   .max(191, 'Title must be 191 characters or fewer');
 
+// the size is checked before sanitising rather than after: an oversized body is
+// turned away without doing the work, and sanitising only ever makes it smaller
 const content = z
   .string()
-  .refine((value) => Buffer.byteLength(value) <= contentLimit, 'Content is too long');
+  .refine((value) => Buffer.byteLength(value) <= contentLimit, 'Content is too long')
+  .transform(sanitiseHtml);
 
 /** What createNote accepts. The routes validate against this too. */
 export const createNoteSchema = z.object({

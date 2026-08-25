@@ -578,6 +578,70 @@ describe('notes', function () {
     });
   });
 
+  describe('markup the editor could not have written', () => {
+    const dirty = '<p>hi</p><script>alert(1)</script><p onclick="alert(1)">there</p>';
+
+    it('never reaches the database when a note is created', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      await createNote(agent, 'Note', dirty);
+
+      const { content } = await prisma.note.findFirstOrThrow();
+      expect(content).to.equal('<p>hi</p><p>there</p>');
+    });
+
+    it('never reaches the database when a note is changed', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      const { id } = await createNote(agent, 'Note', '<p>clean</p>');
+
+      await agent.patch(`/api/notes/${id}`).send({ content: dirty });
+
+      const { content } = await prisma.note.findUniqueOrThrow({ where: { id } });
+      expect(content).to.equal('<p>hi</p><p>there</p>');
+    });
+
+    it('never reaches the database through an import', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      await agent
+        .post('/api/notes/import')
+        .send({ version: 1, notes: [{ title: 'Imported', content: dirty }] });
+
+      const { content } = await prisma.note.findFirstOrThrow();
+      expect(content).to.equal('<p>hi</p><p>there</p>');
+    });
+
+    it('is gone from what the route answers with, not only from the row', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      const response = await agent.post('/api/notes').send({ title: 'Note', content: dirty });
+
+      expect(response.body.note.content).to.not.contain('script');
+      expect(response.body.note.content).to.not.contain('onclick');
+    });
+
+    it('leaves the formatting somebody actually typed alone', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      const rich = '<h3>Title</h3><p><strong>bold</strong> and <em>italic</em></p><ul><li>a</li></ul>';
+
+      await createNote(agent, 'Note', rich);
+
+      const { content } = await prisma.note.findFirstOrThrow();
+      expect(content).to.equal(rich);
+    });
+
+    it('still searches on the words, with the markup gone from both columns', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await createNote(agent, 'Note', '<p>haystack</p><script>needle</script>');
+
+      const found = await agent.get('/api/notes?q=haystack');
+      const missing = await agent.get('/api/notes?q=needle');
+
+      expect(found.body.notes).to.have.length(1);
+      expect(missing.body.notes).to.have.length(0);
+    });
+  });
+
   describe('without a session', () => {
     it('refuses every route', async () => {
       const responses = await Promise.all([
