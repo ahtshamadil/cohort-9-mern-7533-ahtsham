@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 import { prisma } from '../db/prisma.js';
-import { findUserByEmail, userSummaryFields, type UserSummary } from './authService.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { htmlToText } from '../utils/html.js';
 import { HttpError } from '../utils/httpError.js';
 import { logger } from '../utils/logger.js';
 import { parseOrThrow } from '../utils/validation.js';
+import { findUserByEmail, userSummaryFields, type UserSummary } from './authService.js';
 
 /** What a share grants the account it was given to. */
 export type SharePermission = 'view' | 'edit';
@@ -190,14 +191,19 @@ function searchTerm(q: string): string {
   return q.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
-/** Lists a user's own notes, filtered by the search term and in the order asked for. */
-export async function listNotes(userId: number, query: unknown = {}): Promise<Note[]> {
+// the two lists differ only by which notes they draw from - the searching, the
+// ordering and the shape they come back in are the same job
+async function listBy(
+  userId: number,
+  where: Prisma.NoteWhereInput,
+  query: unknown,
+): Promise<Note[]> {
   const { q, sort } = parseOrThrow(listNotesSchema, query);
   const term = q === undefined ? undefined : searchTerm(q);
 
   const rows = await prisma.note.findMany({
     where: {
-      authorId: userId,
+      ...where,
       // title or body, because someone searching for a word does not know which it is in
       ...(term === undefined
         ? {}
@@ -210,6 +216,16 @@ export async function listNotes(userId: number, query: unknown = {}): Promise<No
   });
 
   return rows.map((row) => toNote(row, userId));
+}
+
+/** Lists a user's own notes, filtered by the search term and in the order asked for. */
+export function listNotes(userId: number, query: unknown = {}): Promise<Note[]> {
+  return listBy(userId, { authorId: userId }, query);
+}
+
+/** Lists the notes other accounts have shared with this one. */
+export function listSharedNotes(userId: number, query: unknown = {}): Promise<Note[]> {
+  return listBy(userId, { shares: { some: { userId } } }, query);
 }
 
 /** Returns a note the user owns or has been shared, or throws 404. */

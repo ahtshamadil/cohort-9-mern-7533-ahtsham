@@ -3,7 +3,12 @@ import request from 'supertest';
 
 import { createApp } from '../src/app.js';
 import { isDatabaseReachable, prisma } from '../src/db/prisma.js';
-import { listShares, shareNote, unshareNote } from '../src/services/notesService.js';
+import {
+  listShares,
+  listSharedNotes,
+  shareNote,
+  unshareNote,
+} from '../src/services/notesService.js';
 import { HttpError } from '../src/utils/httpError.js';
 
 const app = createApp();
@@ -164,6 +169,56 @@ describe('shares', function () {
 
       expect(response.status).to.equal(200);
       expect(response.body.notes).to.have.length(0);
+    });
+  });
+
+  describe('the list of notes shared with you', () => {
+    it('holds the note, with its owner and what you may do', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const { id } = await createNote(mine, 'Shared');
+      await share(id, 'someone@example.com', 'edit');
+      const reader = await userId('someone@example.com');
+
+      const notes = await listSharedNotes(reader);
+
+      expect(notes).to.have.length(1);
+      expect(notes[0].title).to.equal('Shared');
+      expect(notes[0].permission).to.equal('edit');
+      expect(notes[0].owner.email).to.equal('ahtsham@example.com');
+    });
+
+    it('is empty for somebody nobody shared with', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      await createNote(mine, 'Mine');
+      const stranger = await userId('someone@example.com');
+
+      expect(await listSharedNotes(stranger)).to.have.length(0);
+    });
+
+    it('leaves out your own notes', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await createNote(mine, 'Mine');
+      const owner = await userId('ahtsham@example.com');
+
+      expect(await listSharedNotes(owner)).to.have.length(0);
+    });
+
+    it('searches and sorts the same way your own list does', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      await signIn('someone@example.com');
+      const apple = await createNote(mine, 'Apple', '<p>fruit</p>');
+      const beetle = await createNote(mine, 'Beetle', '<p>insect</p>');
+      await share(apple.id, 'someone@example.com', 'view');
+      await share(beetle.id, 'someone@example.com', 'view');
+      const reader = await userId('someone@example.com');
+
+      const found = await listSharedNotes(reader, { q: 'insect' });
+      const sorted = await listSharedNotes(reader, { sort: 'title' });
+
+      expect(found.map((note) => note.title)).to.deep.equal(['Beetle']);
+      expect(sorted.map((note) => note.title)).to.deep.equal(['Apple', 'Beetle']);
     });
   });
 
