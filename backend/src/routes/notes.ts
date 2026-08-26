@@ -44,9 +44,9 @@ function noteId(value: string | string[]): number {
 }
 
 notesRouter.get('/', async (req, res) => {
-  const notes = await listNotes(currentUserId(req), req.query);
+  const { notes, total } = await listNotes(currentUserId(req), req.query);
 
-  res.json({ notes });
+  res.json({ notes, total });
 });
 
 notesRouter.post('/', validateBody(createNoteSchema), async (req, res) => {
@@ -86,9 +86,9 @@ notesRouter.post('/import', async (req, res) => {
 });
 
 notesRouter.get('/shared', async (req, res) => {
-  const notes = await listSharedNotes(currentUserId(req), req.query);
+  const { notes, total } = await listSharedNotes(currentUserId(req), req.query);
 
-  res.json({ notes });
+  res.json({ notes, total });
 });
 
 notesRouter.get('/:id', async (req, res) => {

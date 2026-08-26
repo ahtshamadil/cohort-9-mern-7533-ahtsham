@@ -180,8 +180,9 @@ describe('shares', function () {
       await share(id, 'someone@example.com', 'edit');
       const reader = await userId('someone@example.com');
 
-      const notes = await listSharedNotes(reader);
+      const { notes, total } = await listSharedNotes(reader);
 
+      expect(total).to.equal(1);
       expect(notes).to.have.length(1);
       expect(notes[0].title).to.equal('Shared');
       expect(notes[0].permission).to.equal('edit');
@@ -194,7 +195,7 @@ describe('shares', function () {
       await createNote(mine, 'Mine');
       const stranger = await userId('someone@example.com');
 
-      expect(await listSharedNotes(stranger)).to.have.length(0);
+      expect((await listSharedNotes(stranger)).notes).to.have.length(0);
     });
 
     it('leaves out your own notes', async () => {
@@ -202,7 +203,7 @@ describe('shares', function () {
       await createNote(mine, 'Mine');
       const owner = await userId('ahtsham@example.com');
 
-      expect(await listSharedNotes(owner)).to.have.length(0);
+      expect((await listSharedNotes(owner)).notes).to.have.length(0);
     });
 
     it('searches and sorts the same way your own list does', async () => {
@@ -217,8 +218,8 @@ describe('shares', function () {
       const found = await listSharedNotes(reader, { q: 'insect' });
       const sorted = await listSharedNotes(reader, { sort: 'title' });
 
-      expect(found.map((note) => note.title)).to.deep.equal(['Beetle']);
-      expect(sorted.map((note) => note.title)).to.deep.equal(['Apple', 'Beetle']);
+      expect(found.notes.map((note) => note.title)).to.deep.equal(['Beetle']);
+      expect(sorted.notes.map((note) => note.title)).to.deep.equal(['Apple', 'Beetle']);
     });
   });
 

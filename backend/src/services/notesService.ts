@@ -26,6 +26,12 @@ export interface Note {
   permission: NotePermission;
 }
 
+/** A list of notes, and how many the filter matched in total. */
+export interface NoteList {
+  notes: Note[];
+  total: number;
+}
+
 /** A share of one note with one account, as the owner sees it listed. */
 export interface Share {
   user: UserSummary;
@@ -49,6 +55,12 @@ export const exportVersion = 1;
 
 /** The most notes one import may carry. */
 export const importLimit = 200;
+
+/** The most notes one page of a list may hold. */
+export const pageLimit = 100;
+
+/** The page size used when a page was asked for without saying how big. */
+export const defaultPageSize = 20;
 
 /**
  * The most content one note may hold, in bytes. The column takes 16MB, but
@@ -101,6 +113,25 @@ export const listNotesSchema = z.object({
     .optional()
     .transform((value) => (value === '' ? undefined : value)),
   sort: z.enum(['recent', 'oldest', 'title', 'created']).default('recent'),
+  // paging is off unless one of these is asked for, so a client that knows
+  // nothing about it still gets everything it did before
+  page: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce
+      .number()
+      .int('Page must be a whole number')
+      .min(1, 'Page must be at least 1')
+      .optional(),
+  ),
+  limit: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce
+      .number()
+      .int('Limit must be a whole number')
+      .min(1, 'Limit must be at least 1')
+      .max(pageLimit, `Limit can be at most ${pageLimit}`)
+      .optional(),
+  ),
 });
 
 /** What an import file has to look like. */
@@ -201,34 +232,44 @@ async function listBy(
   userId: number,
   where: Prisma.NoteWhereInput,
   query: unknown,
-): Promise<Note[]> {
-  const { q, sort } = parseOrThrow(listNotesSchema, query);
+): Promise<NoteList> {
+  const { q, sort, page, limit } = parseOrThrow(listNotesSchema, query);
   const term = q === undefined ? undefined : searchTerm(q);
 
-  const rows = await prisma.note.findMany({
-    where: {
-      ...where,
-      // title or body, because someone searching for a word does not know which it is in
-      ...(term === undefined
-        ? {}
-        : {
-            OR: [{ title: { contains: term } }, { contentText: { contains: term } }],
-          }),
-    },
-    orderBy: ordering[sort],
-    select: noteFields(userId),
-  });
+  const filter: Prisma.NoteWhereInput = {
+    ...where,
+    // title or body, because someone searching for a word does not know which it is in
+    ...(term === undefined
+      ? {}
+      : {
+          OR: [{ title: { contains: term } }, { contentText: { contains: term } }],
+        }),
+  };
 
-  return rows.map((row) => toNote(row, userId));
+  const size = limit ?? defaultPageSize;
+  const paged = page !== undefined || limit !== undefined;
+
+  const [rows, total] = await Promise.all([
+    prisma.note.findMany({
+      where: filter,
+      orderBy: ordering[sort],
+      select: noteFields(userId),
+      ...(paged ? { skip: ((page ?? 1) - 1) * size, take: size } : {}),
+    }),
+    // the whole count, not the page's, so a client can say how far it has got
+    prisma.note.count({ where: filter }),
+  ]);
+
+  return { notes: rows.map((row) => toNote(row, userId)), total };
 }
 
 /** Lists a user's own notes, filtered by the search term and in the order asked for. */
-export function listNotes(userId: number, query: unknown = {}): Promise<Note[]> {
+export function listNotes(userId: number, query: unknown = {}): Promise<NoteList> {
   return listBy(userId, { authorId: userId }, query);
 }
 
 /** Lists the notes other accounts have shared with this one. */
-export function listSharedNotes(userId: number, query: unknown = {}): Promise<Note[]> {
+export function listSharedNotes(userId: number, query: unknown = {}): Promise<NoteList> {
   return listBy(userId, { shares: { some: { userId } } }, query);
 }
 

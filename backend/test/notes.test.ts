@@ -6,9 +6,11 @@ import { isDatabaseReachable, prisma } from '../src/db/prisma.js';
 import {
   contentLimit,
   createNote as createNoteDirectly,
+  defaultPageSize,
   exportBatch,
   exportVersion,
   importLimit,
+  pageLimit,
   updateNote as updateNoteDirectly,
 } from '../src/services/notesService.js';
 import { HttpError } from '../src/utils/httpError.js';
@@ -641,6 +643,136 @@ describe('notes', function () {
       expect(missing.body.notes).to.have.length(0);
     });
   });
+  describe('GET /api/notes with paging', () => {
+    /** Makes numbered notes, oldest first, so an order is predictable. */
+    async function makeNotes(agent: ReturnType<typeof request.agent>, count: number) {
+      for (let n = 1; n <= count; n += 1) {
+        await createNote(agent, `Note ${String(n).padStart(2, '0')}`);
+      }
+    }
+
+    it('returns everything when no page was asked for', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 25);
+
+      const response = await agent.get('/api/notes');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.notes).to.have.lengthOf(25);
+      expect(response.body.total).to.equal(25);
+    });
+
+    it('gives back only as many as the limit allows', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 25);
+
+      const response = await agent.get('/api/notes').query({ limit: 10, sort: 'title' });
+
+      expect(response.body.notes).to.have.lengthOf(10);
+      expect(response.body.notes[0].title).to.equal('Note 01');
+      // the count is of everything that matched, not of the page
+      expect(response.body.total).to.equal(25);
+    });
+
+    it('walks to the next page', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 25);
+
+      const response = await agent.get('/api/notes').query({ page: 2, limit: 10, sort: 'title' });
+
+      expect(response.body.notes).to.have.lengthOf(10);
+      expect(response.body.notes[0].title).to.equal('Note 11');
+    });
+
+    it('gives a short last page rather than an error', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 25);
+
+      const response = await agent.get('/api/notes').query({ page: 3, limit: 10, sort: 'title' });
+
+      expect(response.body.notes).to.have.lengthOf(5);
+      expect(response.body.total).to.equal(25);
+    });
+
+    it('gives an empty page past the end', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 3);
+
+      const response = await agent.get('/api/notes').query({ page: 9, limit: 10 });
+
+      expect(response.status).to.equal(200);
+      expect(response.body.notes).to.have.lengthOf(0);
+      expect(response.body.total).to.equal(3);
+    });
+
+    it('uses a default page size when a page was asked for without one', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 25);
+
+      const response = await agent.get('/api/notes').query({ page: 1 });
+
+      expect(response.body.notes).to.have.lengthOf(defaultPageSize);
+    });
+
+    it('counts what the search matched, not the whole account', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await createNote(agent, 'Shopping', '<p>milk</p>');
+      await createNote(agent, 'Holiday', '<p>flights</p>');
+
+      const response = await agent.get('/api/notes').query({ q: 'milk', limit: 5 });
+
+      expect(response.body.total).to.equal(1);
+    });
+
+    it('refuses a page size past the cap', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      const response = await agent.get('/api/notes').query({ limit: pageLimit + 1 });
+
+      expect(response.status).to.equal(400);
+      expect(response.body.error.details[0].field).to.equal('limit');
+    });
+
+    it('refuses a page before the first', async () => {
+      const agent = await signIn('ahtsham@example.com');
+
+      const response = await agent.get('/api/notes').query({ page: 0 });
+
+      expect(response.status).to.equal(400);
+      expect(response.body.error.details[0].field).to.equal('page');
+    });
+
+    it('treats a cleared control as no paging rather than a bad request', async () => {
+      const agent = await signIn('ahtsham@example.com');
+      await makeNotes(agent, 3);
+
+      const response = await agent.get('/api/notes?page=&limit=');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.notes).to.have.lengthOf(3);
+    });
+
+    it('pages the shared list the same way', async () => {
+      const mine = await signIn('ahtsham@example.com');
+      const theirs = await signIn('someone@example.com');
+      const reader = await prisma.user.findUniqueOrThrow({
+        where: { email: 'someone@example.com' },
+      });
+      await makeNotes(mine, 5);
+
+      for (const note of await prisma.note.findMany()) {
+        await prisma.noteShare.create({
+          data: { noteId: note.id, userId: reader.id, permission: 'view' },
+        });
+      }
+
+      const response = await theirs.get('/api/notes/shared').query({ limit: 2 });
+
+      expect(response.body.notes).to.have.lengthOf(2);
+      expect(response.body.total).to.equal(5);
+    });
+  });
+
 
   describe('without a session', () => {
     it('refuses every route', async () => {
