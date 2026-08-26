@@ -6,17 +6,28 @@ export interface RichTextEditorProps {
   /** The HTML to show. Replaced in place when it changes. */
   content: string;
   onChange: (html: string) => void;
+  /** Shows the note without letting it be changed, for a view-only share. */
+  readOnly?: boolean;
 }
 
 /** The note body editor, with a small formatting toolbar above it. */
-export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, readOnly = false }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [StarterKit],
     content,
+    editable: !readOnly,
     onUpdate: ({ editor: changed }) => {
       onChange(changed.getHTML());
     },
   });
+
+  // the permission arrives with the note, so the editor is built before it is
+  // known and has to be told once it is. emitUpdate is off for the same reason
+  // it is off above - an update here looks like the user typing, and autosave
+  // would write the note straight back out again
+  useEffect(() => {
+    editor?.setEditable(!readOnly, false);
+  }, [editor, readOnly]);
 
   // switching to another note changes this prop without unmounting, and useEditor
   // only reads content once. without this the previous note's body stays on
@@ -43,6 +54,14 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
 
   if (editor === null) {
     return null;
+  }
+
+  if (readOnly) {
+    return (
+      <div className="editor">
+        <EditorContent editor={editor} className="editor-body" />
+      </div>
+    );
   }
 
   return (
