@@ -3,15 +3,22 @@ import { HttpError } from '../utils/httpError.js';
 import { logger } from '../utils/logger.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 
-/** A user without the password hash. */
-export interface PublicUser {
+/** A user as another account sees them, on a note they own or were shared. */
+export interface UserSummary {
   id: number;
   email: string;
   name: string | null;
+}
+
+/** A user without the password hash. */
+export interface PublicUser extends UserSummary {
   createdAt: Date;
 }
 
-const publicFields = { id: true, email: true, name: true, createdAt: true } as const;
+/** The fields of a user that may be shown to a different account. */
+export const userSummaryFields = { id: true, email: true, name: true } as const;
+
+const publicFields = { ...userSummaryFields, createdAt: true } as const;
 
 /** Picks only the fields a client may see. */
 function toPublicUser(user: PublicUser): PublicUser {
@@ -19,7 +26,7 @@ function toPublicUser(user: PublicUser): PublicUser {
 }
 
 /** Lowercases and trims an address so one account cannot be made twice. */
-function normaliseEmail(email: string): string {
+export function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
@@ -87,4 +94,12 @@ export async function authenticateUser(email: string, password: string): Promise
 /** Finds a user by id, or null if the account is gone. */
 export function findUserById(id: number): Promise<PublicUser | null> {
   return prisma.user.findUnique({ where: { id }, select: publicFields });
+}
+
+/** Finds a user by address, normalised the same way registering normalises it. */
+export function findUserByEmail(email: string): Promise<UserSummary | null> {
+  return prisma.user.findUnique({
+    where: { email: normaliseEmail(email) },
+    select: userSummaryFields,
+  });
 }
