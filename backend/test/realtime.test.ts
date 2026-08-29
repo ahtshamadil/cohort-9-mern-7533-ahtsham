@@ -38,14 +38,22 @@ async function userId(email: string): Promise<number> {
   return id;
 }
 
+/** A note as the API answers with it, once the dates have been through JSON. */
+interface ApiNote {
+  id: number;
+  title: string;
+  content: string;
+  updatedAt: string;
+}
+
 /** Creates a note through the API as whoever the cookie belongs to. */
-async function createNote(cookie: string, title: string, content = '') {
+async function createNote(cookie: string, title: string, content = ''): Promise<ApiNote> {
   const response = await request(server)
     .post('/api/notes')
     .set('Cookie', cookie)
     .send({ title, content });
 
-  return response.body.note;
+  return response.body.note as ApiNote;
 }
 
 /** Opens a socket, carrying the cookie if it was given one. */
@@ -278,9 +286,14 @@ describe('realtime', function () {
       const arrived = nextEvent<Record<string, unknown>>(listening, 'note:updated');
       await saveNote(owner, note.id, { title: 'The new rota' });
 
+      const change = await arrived;
+
       // owner and permission are worked out per reader, so a message two people
       // receive cannot carry either one
-      expect(await arrived).to.have.keys(['id', 'title', 'content', 'updatedAt']);
+      expect(change).to.have.keys(['id', 'title', 'content', 'updatedAt']);
+
+      // json has no date type, so the wire carries the string the client reads
+      expect(change.updatedAt).to.be.a('string');
     });
 
     it('says when a note has been deleted', async () => {

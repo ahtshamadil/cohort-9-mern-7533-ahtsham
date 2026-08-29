@@ -52,7 +52,9 @@ export interface NoteChange {
   id: number;
   title: string;
   content: string;
-  updatedAt: Date;
+  // an ISO string, not a Date - the default parser puts one on the wire and the
+  // receiver gets it back as text whatever this said
+  updatedAt: string;
 }
 
 type NoteSocket = Socket<ClientEvents, ServerEvents, Record<string, never>, SocketData>;
@@ -99,6 +101,10 @@ function authenticate(socket: NoteSocket, next: (err?: Error) => void): void {
   next();
 }
 
+// the longest a single timer can wait. a longer delay overflows and fires at
+// once, which would drop a good socket immediately
+const maxDelay = 2_147_483_647;
+
 // a socket lives as long as it stays connected, but the token that opened it
 // does not. dropping it at expiry keeps a socket from outliving a session every
 // HTTP route would already have rejected
@@ -110,16 +116,15 @@ function disconnectAtExpiry(socket: NoteSocket): void {
     return;
   }
 
-  // a delay past this overflows and fires at once, which would drop a good
-  // socket immediately. an expiry that far off is left to the reconnect
-  if (remaining > 2_147_483_647) {
-    return;
-  }
-
-  const timer = setTimeout(() => socket.disconnect(true), remaining);
+  // an expiry further off than one timer reaches is waited for in steps rather
+  // than left unwatched
+  const timer = setTimeout(
+    () => (remaining > maxDelay ? disconnectAtExpiry(socket) : socket.disconnect(true)),
+    Math.min(remaining, maxDelay),
+  );
 
   timer.unref();
-  socket.on('disconnect', () => clearTimeout(timer));
+  socket.once('disconnect', () => clearTimeout(timer));
 }
 
 /** Puts the socket in a note's room, if the account may read that note. */
@@ -174,7 +179,7 @@ export function noteUpdated(note: Note, savedBy: number, exceptSocketId?: string
     id: note.id,
     title: note.title,
     content: note.content,
-    updatedAt: note.updatedAt,
+    updatedAt: note.updatedAt.toISOString(),
   };
 
   const room = io.to(noteRoom(note.id));
@@ -236,7 +241,14 @@ export function attachRealtime(server: HttpServer): NoteServer {
     socket.join(userRoom(socket.data.userId));
     disconnectAtExpiry(socket);
 
-    socket.on('note:join', (payload, ack) => void join(socket, payload, ack));
+    socket.on('note:join', (payload, ack) => {
+      // nothing else would catch this, and a client left without an answer
+      // would wait for one forever
+      join(socket, payload, ack).catch((cause: unknown) => {
+        logger.error({ err: cause, userId: socket.data.userId }, 'Socket join failed');
+        ack?.({ ok: false, error: 'Could not join that note' });
+      });
+    });
     socket.on('note:leave', (payload) => {
       const noteId = readNoteId(payload);
 
