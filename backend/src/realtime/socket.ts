@@ -140,11 +140,32 @@ async function join(socket: NoteSocket, payload: unknown, ack?: (result: JoinRes
   }
 
   await socket.join(noteRoom(noteId));
+
+  // the share can be taken back between the check above and the join itself,
+  // and the revoke that empties the room would have found nobody in it. asking
+  // again once the socket is in closes that gap from both ends
+  if (!(await canReadNote(socket.data.userId, noteId))) {
+    await socket.leave(noteRoom(noteId));
+    ack?.({ ok: false, error: notFound });
+    return;
+  }
+
   ack?.({ ok: true });
 }
 
+// socket ids and room names share one namespace, so a header naming the note's
+// own room would otherwise exclude everybody in it. only a socket that belongs
+// to whoever saved the note may be left out
+function excludable(savedBy: number, socketId: string | undefined): string | undefined {
+  if (io === null || socketId === undefined) {
+    return undefined;
+  }
+
+  return io.sockets.sockets.get(socketId)?.data.userId === savedBy ? socketId : undefined;
+}
+
 /** Tells everybody in a note's room that it changed, except whoever saved it. */
-export function noteUpdated(note: Note, exceptSocketId?: string): void {
+export function noteUpdated(note: Note, savedBy: number, exceptSocketId?: string): void {
   if (io === null) {
     return;
   }
@@ -160,7 +181,8 @@ export function noteUpdated(note: Note, exceptSocketId?: string): void {
 
   // the editor that saved this already has it, and an echo would land on top of
   // whatever has been typed since the save went out
-  const audience = exceptSocketId === undefined ? room : room.except(exceptSocketId);
+  const quiet = excludable(savedBy, exceptSocketId);
+  const audience = quiet === undefined ? room : room.except(quiet);
 
   audience.emit('note:updated', change);
 }

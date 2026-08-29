@@ -312,6 +312,40 @@ describe('realtime', function () {
       expect((await arrived).noteId).to.equal(note.id);
     });
 
+    it('ignores a socket id that names the room rather than a socket', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const watching = await socketFor(reader);
+      await join(watching, note.id);
+
+      // ids and room names share a namespace, so an unchecked header could name
+      // the note's own room and silence everybody in it
+      const arrived = nextEvent<{ title: string }>(watching, 'note:updated');
+      await saveNote(owner, note.id, { title: 'The new rota' }, `note:${note.id}`);
+
+      expect((await arrived).title).to.equal('The new rota');
+    });
+
+    it('ignores a socket id belonging to somebody else', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const watching = await socketFor(reader);
+      await join(watching, note.id);
+
+      const arrived = nextEvent<{ title: string }>(watching, 'note:updated');
+      await saveNote(owner, note.id, { title: 'The new rota' }, watching.id);
+
+      expect((await arrived).title).to.equal('The new rota');
+    });
+
     it('does not send a save back to the socket that made it', async () => {
       const owner = await signIn('owner@example.com');
       const note = await createNote(owner, 'Rota');

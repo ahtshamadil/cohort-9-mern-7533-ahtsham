@@ -103,8 +103,9 @@ notesRouter.patch('/:id', validateBody(updateNoteSchema), async (req, res) => {
   const note = await updateNote(currentUserId(req), noteId(req.params.id), body);
 
   // the save arrives over http, so the socket that made it can only be left out
-  // of the broadcast if the client says which one it was
-  noteUpdated(note, req.get('x-socket-id'));
+  // of the broadcast if the client says which one it was. it is taken as a
+  // claim, not a fact - the id is only honoured if it belongs to this account
+  noteUpdated(note, currentUserId(req), req.get('x-socket-id'));
 
   res.json({ note });
 });
