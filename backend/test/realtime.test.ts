@@ -83,6 +83,13 @@ function shareWith(cookie: string, noteId: number, email: string, permission = '
     .send({ email, permission });
 }
 
+/** Takes a share back, through the route. */
+function unshare(cookie: string, noteId: number, targetUserId: number) {
+  return request(server)
+    .delete(`/api/notes/${noteId}/shares/${targetUserId}`)
+    .set('Cookie', cookie);
+}
+
 /** Saves a change to a note, naming the socket that made it where there is one. */
 function saveNote(cookie: string, noteId: number, body: object, socketId?: string) {
   const call = request(server).patch(`/api/notes/${noteId}`).set('Cookie', cookie);
@@ -325,6 +332,60 @@ describe('realtime', function () {
 
       expect((await arrived).title).to.equal('The new rota');
       expect(await echo, 'the saving socket heard its own change').to.equal(true);
+    });
+  });
+  describe('taking a share back', () => {
+    it('tells the account it has lost the note', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+
+      const arrived = nextEvent<{ noteId: number }>(listening, 'share:revoked');
+      await unshare(owner, note.id, await userId('reader@example.com'));
+
+      expect((await arrived).noteId).to.equal(note.id);
+    });
+
+    it('stops the note reaching them afterwards', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+
+      await unshare(owner, note.id, await userId('reader@example.com'));
+
+      // still connected, and still in a room it joined while the share stood -
+      // unless the revoke took the room away
+      const heard = heardNothing(listening, 'note:updated');
+      await saveNote(owner, note.id, { title: 'The new rota' });
+
+      expect(await heard, 'an ex-reader was still receiving the note').to.equal(true);
+    });
+
+    it('refuses to let them join it again', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+      await unshare(owner, note.id, await userId('reader@example.com'));
+
+      expect(await join(listening, note.id)).to.deep.equal({
+        ok: false,
+        error: 'Note not found',
+      });
     });
   });
 });

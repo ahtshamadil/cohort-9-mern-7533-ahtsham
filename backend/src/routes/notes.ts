@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import { currentUserId, requireAuth } from '../middleware/requireAuth.js';
-import { noteDeleted, noteUpdated, shareGranted } from '../realtime/socket.js';
+import { noteDeleted, noteUpdated, shareGranted, shareRevoked } from '../realtime/socket.js';
 import { validateBody } from '../middleware/validate.js';
 import {
   createNote,
@@ -136,11 +136,11 @@ notesRouter.post('/:id/shares', validateBody(shareNoteSchema), async (req, res) 
 });
 
 notesRouter.delete('/:id/shares/:userId', async (req, res) => {
-  await unshareNote(
-    currentUserId(req),
-    noteId(req.params.id),
-    wholeNumber(req.params.userId, 'User id'),
-  );
+  const id = noteId(req.params.id);
+  const targetUserId = wholeNumber(req.params.userId, 'User id');
+
+  await unshareNote(currentUserId(req), id, targetUserId);
+  shareRevoked(targetUserId, id);
 
   res.status(204).send();
 });

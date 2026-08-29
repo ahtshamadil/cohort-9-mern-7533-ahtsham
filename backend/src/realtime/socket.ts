@@ -186,6 +186,22 @@ export function shareGranted(userId: number, noteId: number): void {
   io.to(userRoom(userId)).emit('share:granted', { noteId });
 }
 
+/**
+ * Tells an account a note is no longer shared with it, and takes the room away.
+ *
+ * Leaving the room is the point. A socket that joined while the share stood
+ * would otherwise keep receiving that note's content after it was taken back,
+ * which is a permission leak rather than a stale screen.
+ */
+export function shareRevoked(userId: number, noteId: number): void {
+  if (io === null) {
+    return;
+  }
+
+  io.to(userRoom(userId)).emit('share:revoked', { noteId });
+  io.in(userRoom(userId)).socketsLeave(noteRoom(noteId));
+}
+
 /** Starts the socket server on the same http server the API is served from. */
 export function attachRealtime(server: HttpServer): NoteServer {
   const created: NoteServer = new Server(server, { path: realtimePath });
