@@ -431,12 +431,32 @@ describe('DashboardPage', () => {
       expect(await screen.findByText('Nothing shared yet')).toBeInTheDocument();
     });
 
+    it('does not blame the shared list for a failure on your own', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 0, networkError: true },
+        'GET /api/notes/shared': { ...shared, delayMs: 300 },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('alert');
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      // the shared list is still in flight, so nothing about it has failed yet
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+    });
+
     it('searches the shared list rather than your own', async () => {
+      const match = { ...theirs, id: 10, title: 'Rota changes' };
+
       stubApi({
         ...signedIn,
         'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
         'GET /api/notes/shared': shared,
-        'GET /api/notes/shared?q=rota': shared,
+        'GET /api/notes/shared?q=rota': { status: 200, body: { notes: [match], total: 1 } },
       });
 
       renderApp('/');
@@ -446,10 +466,10 @@ describe('DashboardPage', () => {
       await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
       await screen.findByRole('heading', { name: 'Rota' });
 
-      // a stub the search did not match would reject, so arriving is the assertion
       await user.type(screen.getByLabelText('Search notes'), 'rota');
 
-      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+      // only the shared search answers with this note, so finding it is the assertion
+      expect(await screen.findByRole('heading', { name: 'Rota changes' })).toBeInTheDocument();
     });
   });
 });

@@ -178,6 +178,7 @@ export function DashboardPage() {
     setTab(next);
     setNotes(null);
     setNotice(null);
+    setError(null);
   }
 
   const displayName = user?.name ?? user?.email ?? '';
