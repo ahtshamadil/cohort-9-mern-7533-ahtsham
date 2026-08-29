@@ -3,7 +3,7 @@ import type { Server as HttpServer } from 'node:http';
 import cookieParser from 'cookie-parser';
 import { Server, type Socket } from 'socket.io';
 
-import { canReadNote } from '../services/notesService.js';
+import { canReadNote, type Note } from '../services/notesService.js';
 import { AUTH_COOKIE } from '../utils/authCookie.js';
 import { logger } from '../utils/logger.js';
 import { verifySession } from '../utils/token.js';
@@ -141,6 +141,49 @@ async function join(socket: NoteSocket, payload: unknown, ack?: (result: JoinRes
 
   await socket.join(noteRoom(noteId));
   ack?.({ ok: true });
+}
+
+/** Tells everybody in a note's room that it changed, except whoever saved it. */
+export function noteUpdated(note: Note, exceptSocketId?: string): void {
+  if (io === null) {
+    return;
+  }
+
+  const change: NoteChange = {
+    id: note.id,
+    title: note.title,
+    content: note.content,
+    updatedAt: note.updatedAt,
+  };
+
+  const room = io.to(noteRoom(note.id));
+
+  // the editor that saved this already has it, and an echo would land on top of
+  // whatever has been typed since the save went out
+  const audience = exceptSocketId === undefined ? room : room.except(exceptSocketId);
+
+  audience.emit('note:updated', change);
+}
+
+/** Tells everybody in a note's room that it is gone, and empties the room. */
+export function noteDeleted(id: number): void {
+  if (io === null) {
+    return;
+  }
+
+  io.to(noteRoom(id)).emit('note:deleted', { id });
+  io.in(noteRoom(id)).socketsLeave(noteRoom(id));
+}
+
+/** Tells an account that a note has been shared with it. */
+export function shareGranted(userId: number, noteId: number): void {
+  if (io === null) {
+    return;
+  }
+
+  // the note itself is not sent - the recipient asks for it, and gets it shaped
+  // with the permission they were just given
+  io.to(userRoom(userId)).emit('share:granted', { noteId });
 }
 
 /** Starts the socket server on the same http server the API is served from. */

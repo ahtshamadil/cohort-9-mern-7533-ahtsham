@@ -75,6 +75,45 @@ function socketFor(cookie: string): Promise<ClientSocket> {
   return connected(open(cookie));
 }
 
+/** Shares a note with an address, through the route rather than the table. */
+function shareWith(cookie: string, noteId: number, email: string, permission = 'view') {
+  return request(server)
+    .post(`/api/notes/${noteId}/shares`)
+    .set('Cookie', cookie)
+    .send({ email, permission });
+}
+
+/** Saves a change to a note, naming the socket that made it where there is one. */
+function saveNote(cookie: string, noteId: number, body: object, socketId?: string) {
+  const call = request(server).patch(`/api/notes/${noteId}`).set('Cookie', cookie);
+
+  return (socketId === undefined ? call : call.set('x-socket-id', socketId)).send(body);
+}
+
+/** The next event of this name, or a rejection saying it never came. */
+function nextEvent<T>(socket: ClientSocket, event: string, within = 2000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`No ${event} within ${within}ms`)), within);
+
+    socket.once(event, (payload: T) => {
+      clearTimeout(timer);
+      resolve(payload);
+    });
+  });
+}
+
+/** Whether nothing of this name arrived in the window. Proving a negative costs time. */
+function heardNothing(socket: ClientSocket, event: string, within = 400): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(true), within);
+
+    socket.once(event, () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+
 /** Asks to join a note and hands back what the server answered. */
 async function join(socket: ClientSocket, noteId: unknown): Promise<JoinResult> {
   return (await socket.emitWithAck('note:join', { noteId })) as JoinResult;
@@ -159,10 +198,7 @@ describe('realtime', function () {
       const note = await createNote(owner, 'Rota');
       const reader = await signIn('reader@example.com');
 
-      await request(server)
-        .post(`/api/notes/${note.id}/shares`)
-        .set('Cookie', owner)
-        .send({ email: 'reader@example.com', permission: 'view' });
+      await shareWith(owner, note.id, 'reader@example.com');
 
       expect(await join(await socketFor(reader), note.id)).to.deep.equal({ ok: true });
     });
@@ -187,6 +223,108 @@ describe('realtime', function () {
         ok: false,
         error: 'A note id is required',
       });
+    });
+  });
+  describe('telling the room', () => {
+    it('reaches a reader when the owner saves', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota', '<p>Tuesday is yours</p>');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+
+      const arrived = nextEvent<{ title: string; content: string }>(listening, 'note:updated');
+      await saveNote(owner, note.id, { content: '<p>Wednesday is yours</p>' });
+
+      expect((await arrived).content).to.equal('<p>Wednesday is yours</p>');
+    });
+
+    it('reaches the owner when somebody with an edit share saves', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const editor = await signIn('editor@example.com');
+
+      await shareWith(owner, note.id, 'editor@example.com', 'edit');
+
+      const listening = await socketFor(owner);
+      await join(listening, note.id);
+
+      const arrived = nextEvent<{ title: string }>(listening, 'note:updated');
+      await saveNote(editor, note.id, { title: 'The new rota' });
+
+      expect((await arrived).title).to.equal('The new rota');
+    });
+
+    it('leaves out the fields that mean something different to each reader', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+
+      const arrived = nextEvent<Record<string, unknown>>(listening, 'note:updated');
+      await saveNote(owner, note.id, { title: 'The new rota' });
+
+      // owner and permission are worked out per reader, so a message two people
+      // receive cannot carry either one
+      expect(await arrived).to.have.keys(['id', 'title', 'content', 'updatedAt']);
+    });
+
+    it('says when a note has been deleted', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const listening = await socketFor(reader);
+      await join(listening, note.id);
+
+      const arrived = nextEvent<{ id: number }>(listening, 'note:deleted');
+      await request(server).delete(`/api/notes/${note.id}`).set('Cookie', owner);
+
+      expect((await arrived).id).to.equal(note.id);
+    });
+
+    it('tells an account when a note is shared with it, without joining anything', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      const listening = await socketFor(reader);
+
+      const arrived = nextEvent<{ noteId: number }>(listening, 'share:granted');
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      expect((await arrived).noteId).to.equal(note.id);
+    });
+
+    it('does not send a save back to the socket that made it', async () => {
+      const owner = await signIn('owner@example.com');
+      const note = await createNote(owner, 'Rota');
+      const reader = await signIn('reader@example.com');
+
+      await shareWith(owner, note.id, 'reader@example.com');
+
+      const saving = await socketFor(owner);
+      const watching = await socketFor(reader);
+
+      await join(saving, note.id);
+      await join(watching, note.id);
+
+      const echo = heardNothing(saving, 'note:updated');
+      const arrived = nextEvent<{ title: string }>(watching, 'note:updated');
+
+      await saveNote(owner, note.id, { title: 'The new rota' }, saving.id);
+
+      expect((await arrived).title).to.equal('The new rota');
+      expect(await echo, 'the saving socket heard its own change').to.equal(true);
     });
   });
 });
