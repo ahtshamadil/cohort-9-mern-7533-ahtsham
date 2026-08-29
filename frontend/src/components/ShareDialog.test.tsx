@@ -60,6 +60,27 @@ describe('ShareDialog', () => {
     expect(await screen.findByText('someone@example.com')).toBeInTheDocument();
   });
 
+  it('keeps a share made while the list was still loading', async () => {
+    stubApi({
+      // held back so the share below is submitted before this answer arrives
+      'GET /api/notes/1/shares': { status: 200, body: { shares: [] }, delayMs: 500 },
+      'POST /api/notes/1/shares': { status: 201, body: { share } },
+    });
+
+    render(<ShareDialog noteId={1} onClose={jest.fn()} />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText('Email address'), 'someone@example.com');
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(await screen.findByText('someone@example.com')).toBeInTheDocument();
+
+    // the older list lands afterwards, and must not take the new row back out
+    await expect(
+      screen.findByText('This note is not shared with anybody yet.', undefined, { timeout: 2000 }),
+    ).rejects.toThrow();
+  });
+
   it('empties the box after a share so the next one starts clean', async () => {
     stubApi({ ...noShares, 'POST /api/notes/1/shares': { status: 201, body: { share } } });
 

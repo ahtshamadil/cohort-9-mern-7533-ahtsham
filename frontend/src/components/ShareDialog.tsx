@@ -30,13 +30,15 @@ export function ShareDialog({ noteId, onClose }: { noteId: number; onClose: () =
   const [busy, setBusy] = useState(false);
 
   const panel = useRef<HTMLDivElement>(null);
+  const changed = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     listShares(noteId)
       .then((found) => {
-        if (!cancelled) setShares(found);
+        // sharing before the list arrives would otherwise be undone by it
+        if (!cancelled && !changed.current) setShares(found);
       })
       .catch((cause: Error) => {
         if (!cancelled) setError(cause.message);
@@ -84,6 +86,8 @@ export function ShareDialog({ noteId, onClose }: { noteId: number; onClose: () =
     try {
       const share = await shareNote(noteId, email, permission);
 
+      changed.current = true;
+
       // sharing again changes what an existing share grants rather than adding
       // a second one, so the row is replaced where there already was one
       setShares((current) => [
@@ -104,6 +108,8 @@ export function ShareDialog({ noteId, onClose }: { noteId: number; onClose: () =
 
     try {
       await unshareNote(noteId, userId);
+
+      changed.current = true;
       setShares((current) => (current ?? []).filter((held) => held.user.id !== userId));
     } catch {
       setError('Could not remove that person. Try again.');
