@@ -16,6 +16,7 @@ import { useAuth } from '../auth/useAuth';
 import { ExportMenu, type ExportFormat } from '../components/ExportMenu';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { useUserEvents } from '../realtime/socket';
 
 /** Which of the two lists the dashboard is showing. */
 type Tab = 'mine' | 'shared';
@@ -107,6 +108,15 @@ export function DashboardPage() {
       cancelled = true;
     };
   }, [term, sort, tab, page, reloads]);
+
+  // both of these only ever reach the account they are about, so the only list
+  // they can change is the shared one. the note itself is not in the message -
+  // it is asked for again, and comes back shaped for whoever is reading it
+  useUserEvents({
+    onShareChanged: () => {
+      if (tab === 'shared') setReloads((count) => count + 1);
+    },
+  });
 
   // deleting the last note on the last page leaves the list sitting past the end
   // of itself, which looks like an empty account rather than an empty page

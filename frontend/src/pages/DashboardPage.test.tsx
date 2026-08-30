@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp, restoreFetch, stubApi, testUser } from '../test/harness';
+import { server } from '../test/realtime';
 
 const signedIn = { 'GET /api/auth/me': { status: 200, body: { user: testUser } } };
 
@@ -30,6 +31,7 @@ const both = { status: 200, body: { notes: [note, other], total: 2 } };
 describe('DashboardPage', () => {
   afterEach(() => {
     restoreFetch();
+    server.reset();
     jest.restoreAllMocks();
   });
 
@@ -473,6 +475,62 @@ describe('DashboardPage', () => {
       // the two lists were written at different times and said the same thing
       // while waiting, which was only ever right for one of them
       expect(screen.getByText('Loading the notes shared with you...')).toBeInTheDocument();
+    });
+
+    it('picks up a note the moment it is shared', async () => {
+      let sharedNotes: unknown = { notes: [], total: 0 };
+
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': {
+          status: 200,
+          // read when the request is answered rather than when it is stubbed, so
+          // the second ask sees what the share left behind
+          get body() {
+            return sharedNotes;
+          },
+        },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Nothing shared yet' });
+
+      sharedNotes = { notes: [theirs], total: 1 };
+      server.shareChanged(theirs.id);
+
+      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+    });
+
+    it('drops a note the moment the share is taken back', async () => {
+      let sharedNotes: unknown = { notes: [theirs], total: 1 };
+
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': {
+          status: 200,
+          get body() {
+            return sharedNotes;
+          },
+        },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Rota' });
+
+      sharedNotes = { notes: [], total: 0 };
+      server.shareChanged(theirs.id);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Nothing shared yet' }),
+      ).toBeInTheDocument();
     });
 
     it('starts on your own notes rather than the shared ones', async () => {
