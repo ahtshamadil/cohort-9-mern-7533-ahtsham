@@ -452,9 +452,10 @@
   top: 0;
   z-index: 10;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   padding: 0.875rem 1.5rem;
   background-color: var(--surface-raised);
   border-bottom: 1px solid var(--rule);
@@ -825,6 +826,7 @@
 }
 
 .editor-tool {
+  min-height: 1.875rem;
   padding: 0.3125rem 0.625rem;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -1080,8 +1082,10 @@
 
 .share-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   gap: 1rem;
 }
 
@@ -1109,5 +1113,47 @@
 
   h1 {
     font-size: 1.875rem;
+  }
+
+  .app-header {
+    padding: 0.75rem 1rem;
+  }
+
+  /* the actions take the whole of the second row rather than being squeezed
+     onto the first one beside the logo */
+  .app-header-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .app-user {
+    max-width: 8rem;
+  }
+
+  /* a wrapped toolbar is three or four rows on a phone, and sticking that to the
+     top costs more of the screen than reaching the buttons is worth */
+  .editor-toolbar {
+    position: static;
+  }
+
+  .editor-tool {
+    min-height: 2.25rem;
+  }
+
+  /* pushed right, the buttons leave a gap wide enough to look like a mistake */
+  .editor-bar-actions {
+    margin-left: 0;
+  }
+
+  .notes-filters {
+    flex-wrap: wrap;
+  }
+
+  .note-list {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-body .tiptap {
+    padding: 1rem;
   }
 }
