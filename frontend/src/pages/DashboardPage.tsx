@@ -23,6 +23,9 @@ type Tab = 'mine' | 'shared';
 /** How long to wait after the last keystroke before searching. */
 const searchDelayMs = 300;
 
+/** How many notes one page holds. Sent rather than left to the API's own default. */
+const pageSize = 20;
+
 const sortOptions: { value: NoteSort; label: string }[] = [
   { value: 'recent', label: 'Recently changed' },
   { value: 'oldest', label: 'Least recently changed' },
@@ -59,9 +62,11 @@ export function DashboardPage() {
   const [term, setTerm] = useState('');
   const [sort, setSort] = useState<NoteSort>('recent');
   const [tab, setTab] = useState<Tab>('mine');
+  const [page, setPage] = useState(1);
   const [reloads, setReloads] = useState(0);
 
   const [notes, setNotes] = useState<Note[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
@@ -70,7 +75,12 @@ export function DashboardPage() {
   // searching on every keystroke would be a request per letter. each one restarts
   // the timer, so only the last of a burst is ever asked for
   useEffect(() => {
-    const timer = setTimeout(() => setTerm(search), searchDelayMs);
+    const timer = setTimeout(() => {
+      setTerm(search);
+      // a search narrows the list, so whatever page number was reached in the
+      // old one means nothing in the new one
+      setPage(1);
+    }, searchDelayMs);
 
     return () => clearTimeout(timer);
   }, [search]);
@@ -80,11 +90,12 @@ export function DashboardPage() {
 
     const load = tab === 'mine' ? listNotes : listSharedNotes;
 
-    load({ q: term, sort })
-      .then(({ notes: found }) => {
+    load({ q: term, sort, page, limit: pageSize })
+      .then(({ notes: found, total: matched }) => {
         if (cancelled) return;
 
         setNotes(found);
+        setTotal(matched);
         setError(null);
       })
       .catch((cause: Error) => {
@@ -95,7 +106,15 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [term, sort, tab, reloads]);
+  }, [term, sort, tab, page, reloads]);
+
+  // deleting the last note on the last page leaves the list sitting past the end
+  // of itself, which looks like an empty account rather than an empty page
+  useEffect(() => {
+    const last = Math.max(1, Math.ceil(total / pageSize));
+
+    if (page > last) setPage(last);
+  }, [total, page]);
 
   /** Ends the session and leaves, or reports why it could not. */
   async function handleLogout() {
@@ -176,11 +195,13 @@ export function DashboardPage() {
     }
 
     setTab(next);
+    setPage(1);
     setNotes(null);
     setNotice(null);
     setError(null);
   }
 
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   const displayName = user?.name ?? user?.email ?? '';
   const searching = term !== '';
   const mine = tab === 'mine';
@@ -256,7 +277,10 @@ export function DashboardPage() {
               id="notes-sort"
               className="notes-sort"
               value={sort}
-              onChange={(event) => setSort(event.target.value as NoteSort)}
+              onChange={(event) => {
+                setSort(event.target.value as NoteSort);
+                setPage(1);
+              }}
             >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -313,7 +337,7 @@ export function DashboardPage() {
         {/* the list changes without anything being clicked, so the count is
             announced rather than left to be noticed */}
         <p className="visually-hidden" role="status">
-          {notes === null ? '' : counted(notes.length)}
+          {notes === null ? '' : counted(total)}
         </p>
 
         {notes !== null && notes.length === 0 && !searching && (
@@ -350,6 +374,32 @@ export function DashboardPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {notes !== null && pages > 1 && (
+          <nav className="pager" aria-label="Pages of notes">
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page === 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              Previous
+            </button>
+
+            <span className="muted">
+              Page {page} of {pages} - {counted(total)}
+            </span>
+
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page >= pages}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </nav>
         )}
 
         {notes === null && error === null && <p className="muted">Loading your notes...</p>}

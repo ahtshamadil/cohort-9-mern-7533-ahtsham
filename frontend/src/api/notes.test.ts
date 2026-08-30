@@ -39,6 +39,32 @@ describe('listNotes', () => {
       total: 0,
     });
   });
+
+  it('asks for one page at a time when a page and a size are given', async () => {
+    stubApi({ 'GET /api/notes?page=2&limit=20': { status: 200, body: { notes: [], total: 45 } } });
+
+    await expect(listNotes({ page: 2, limit: 20 })).resolves.toEqual({ notes: [], total: 45 });
+  });
+
+  it('asks for no page at all unless both are given', async () => {
+    // the API turns paging on the moment it sees either, and a page without a
+    // size would be a page of whatever the server picked rather than of 20
+    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
+
+    await expect(listNotes({ page: 2 })).resolves.toEqual({ notes: [], total: 0 });
+    await expect(listNotes({ limit: 20 })).resolves.toEqual({ notes: [], total: 0 });
+  });
+
+  it('keeps the search alongside the page', async () => {
+    stubApi({
+      'GET /api/notes?q=milk&page=2&limit=20': { status: 200, body: { notes: [], total: 45 } },
+    });
+
+    await expect(listNotes({ q: 'milk', page: 2, limit: 20 })).resolves.toEqual({
+      notes: [],
+      total: 45,
+    });
+  });
 });
 
 describe('listSharedNotes', () => {

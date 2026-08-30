@@ -50,10 +50,13 @@ export interface NoteInput {
 /** The orders GET /api/notes will sort by. */
 export type NoteSort = 'recent' | 'oldest' | 'title' | 'created';
 
-/** What the list route accepts. Both are optional. */
+/** What the list route accepts. All of it is optional. */
 export interface NoteQuery {
   q?: string;
   sort?: NoteSort;
+  /** 1-based. The API sends every match when neither this nor limit is asked for. */
+  page?: number;
+  limit?: number;
 }
 
 /** The API's own default, so it is left out of the URL rather than sent back to it. */
@@ -70,6 +73,13 @@ function listSearch(query: NoteQuery): string {
 
   if (query.sort !== undefined && query.sort !== defaultSort) {
     params.set('sort', query.sort);
+  }
+
+  // both are sent or neither is. the API turns paging on the moment it sees one
+  // of them, and a page without a size is a page of whatever the server picked
+  if (query.page !== undefined && query.limit !== undefined) {
+    params.set('page', String(query.page));
+    params.set('limit', String(query.limit));
   }
 
   const search = params.toString();

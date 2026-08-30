@@ -174,7 +174,7 @@ describe('NoteEditorPage', () => {
       ...signedIn,
       'GET /api/notes/1': { status: 200, body: { note } },
       'DELETE /api/notes/1': { status: 204 },
-      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
     });
 
     renderApp('/notes/1');
@@ -228,7 +228,7 @@ describe('NoteEditorPage', () => {
       ...signedIn,
       'GET /api/notes/1': { status: 200, body: { note } },
       'PATCH /api/notes/1': { status: 200, body: { note } },
-      'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
     });
 
     renderApp('/notes/1');
@@ -285,7 +285,7 @@ describe('NoteEditorPage', () => {
       stubApi({
         ...signedIn,
         'GET /api/notes/1': { status: 200, body: { note: viewOnly } },
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
       });
 
       renderApp('/notes/1');
