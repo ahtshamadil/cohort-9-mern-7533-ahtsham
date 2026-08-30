@@ -1,6 +1,6 @@
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
-import { useEffect } from 'react';
 import StarterKit from '@tiptap/starter-kit';
+import { useEffect } from 'react';
 
 export interface RichTextEditorProps {
   /** The HTML to show. Replaced in place when it changes. */
@@ -10,10 +10,22 @@ export interface RichTextEditorProps {
   readOnly?: boolean;
 }
 
-/** The note body editor, with a small formatting toolbar above it. */
+/** The heading levels the toolbar offers, and paragraph as the absence of one. */
+const levels = [0, 1, 2, 3] as const;
+
+const levelNames: Record<(typeof levels)[number], string> = {
+  0: 'Paragraph',
+  1: 'Heading 1',
+  2: 'Heading 2',
+  3: 'Heading 3',
+};
+
+/** The note body editor, with a formatting toolbar above it. */
 export function RichTextEditor({ content, onChange, readOnly = false }: RichTextEditorProps) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    // every mark and node here is one the API's sanitiser allows through. a
+    // button writing a tag the server strips would lose the formatting on save
+    extensions: [StarterKit.configure({ link: { openOnClick: false } })],
     content,
     editable: !readOnly,
     onUpdate: ({ editor: changed }) => {
@@ -44,11 +56,18 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
+      level: levels.find((level) => level > 0 && current?.isActive('heading', { level })) ?? 0,
       bold: current?.isActive('bold') ?? false,
       italic: current?.isActive('italic') ?? false,
-      heading: current?.isActive('heading', { level: 2 }) ?? false,
+      underline: current?.isActive('underline') ?? false,
+      strike: current?.isActive('strike') ?? false,
+      code: current?.isActive('code') ?? false,
       bulletList: current?.isActive('bulletList') ?? false,
       orderedList: current?.isActive('orderedList') ?? false,
+      blockquote: current?.isActive('blockquote') ?? false,
+      codeBlock: current?.isActive('codeBlock') ?? false,
+      canUndo: current?.can().undo() ?? false,
+      canRedo: current?.can().redo() ?? false,
     }),
   });
 
@@ -64,48 +83,99 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
     );
   }
 
+  /** One toggle in the toolbar, pressed while its mark or block is active. */
+  function tool(label: string, shortcut: string, on: boolean, run: () => void) {
+    return (
+      <button
+        type="button"
+        className="editor-tool"
+        title={`${label} (${shortcut})`}
+        aria-pressed={on}
+        onClick={run}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  const chain = () => editor.chain().focus();
+
   return (
     <div className="editor">
       <div className="editor-toolbar" role="toolbar" aria-label="Formatting">
+        <select
+          className="editor-style"
+          aria-label="Text style"
+          value={String(active.level)}
+          onChange={(event) => {
+            const level = Number(event.target.value);
+
+            if (level === 0) {
+              chain().setParagraph().run();
+              return;
+            }
+
+            chain()
+              .setHeading({ level: level as 1 | 2 | 3 })
+              .run();
+          }}
+        >
+          {levels.map((level) => (
+            <option key={level} value={level}>
+              {levelNames[level]}
+            </option>
+          ))}
+        </select>
+
+        <span className="editor-tool-divider" />
+
+        {tool('Bold', 'Ctrl+B', active.bold, () => chain().toggleBold().run())}
+        {tool('Italic', 'Ctrl+I', active.italic, () => chain().toggleItalic().run())}
+        {tool('Underline', 'Ctrl+U', active.underline, () => chain().toggleUnderline().run())}
+        {tool('Strike', 'Ctrl+Shift+S', active.strike, () => chain().toggleStrike().run())}
+        {tool('Code', 'Ctrl+E', active.code, () => chain().toggleCode().run())}
+
+        <span className="editor-tool-divider" />
+
+        {tool('Bullet list', 'Ctrl+Shift+8', active.bulletList, () =>
+          chain().toggleBulletList().run(),
+        )}
+        {tool('Numbered list', 'Ctrl+Shift+7', active.orderedList, () =>
+          chain().toggleOrderedList().run(),
+        )}
+        {tool('Quote', 'Ctrl+Shift+B', active.blockquote, () => chain().toggleBlockquote().run())}
+        {tool('Code block', 'Ctrl+Alt+C', active.codeBlock, () => chain().toggleCodeBlock().run())}
+
+        <span className="editor-tool-divider" />
+
         <button
           type="button"
           className="editor-tool"
-          aria-pressed={active.bold}
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          title="Divider"
+          onClick={() => chain().setHorizontalRule().run()}
         >
-          Bold
+          Divider
+        </button>
+
+        <span className="editor-tool-divider" />
+
+        <button
+          type="button"
+          className="editor-tool"
+          title="Undo (Ctrl+Z)"
+          disabled={!active.canUndo}
+          onClick={() => chain().undo().run()}
+        >
+          Undo
         </button>
         <button
           type="button"
           className="editor-tool"
-          aria-pressed={active.italic}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          title="Redo (Ctrl+Shift+Z)"
+          disabled={!active.canRedo}
+          onClick={() => chain().redo().run()}
         >
-          Italic
-        </button>
-        <button
-          type="button"
-          className="editor-tool"
-          aria-pressed={active.heading}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        >
-          Heading
-        </button>
-        <button
-          type="button"
-          className="editor-tool"
-          aria-pressed={active.bulletList}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          Bullets
-        </button>
-        <button
-          type="button"
-          className="editor-tool"
-          aria-pressed={active.orderedList}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          Numbers
+          Redo
         </button>
       </div>
 

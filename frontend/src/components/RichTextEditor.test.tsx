@@ -81,6 +81,88 @@ describe('RichTextEditor', () => {
     expect(changes).toHaveLength(0);
   });
 
+  it('offers a toggle for every mark and block the sanitiser allows', async () => {
+    render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+    await screen.findByText('Start');
+
+    // each of these writes a tag the API's allow-list already accepts. a button
+    // for anything else would lose its formatting the moment the note was saved
+    for (const label of [
+      'Bold',
+      'Italic',
+      'Underline',
+      'Strike',
+      'Code',
+      'Bullet list',
+      'Numbered list',
+      'Quote',
+      'Code block',
+    ]) {
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    }
+  });
+
+  it.each([
+    ['Underline', '<u>Start</u>'],
+    ['Strike', '<s>Start</s>'],
+    ['Code', '<code>Start</code>'],
+    ['Quote', '<blockquote><p>Start</p></blockquote>'],
+    ['Code block', '<pre><code>Start</code></pre>'],
+  ])('writes %s as %s', async (label, markup) => {
+    const changes: string[] = [];
+    render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+    const user = userEvent.setup();
+
+    // clicking places no caret in jsdom, but it does put the focus in the
+    // editor, which is what the select-all below needs
+    await user.click(await screen.findByText('Start'));
+
+    // the text is selected before the button is pressed rather than after. a
+    // toggle with nothing selected only sets a stored mark, and whether that
+    // mark survives to the next keystroke is a race this has already lost once
+    await user.keyboard('{Control>}a{/Control}');
+    await user.click(screen.getByRole('button', { name: label }));
+
+    expect(changes.at(-1)).toContain(markup);
+  });
+
+  it('changes the block to the heading level the style select asks for', async () => {
+    const changes: string[] = [];
+    render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+    const user = userEvent.setup();
+
+    const style = await screen.findByRole('combobox', { name: 'Text style' });
+    expect(style).toHaveValue('0');
+
+    await user.selectOptions(style, '3');
+
+    expect(changes.at(-1)).toContain('<h3>Start</h3>');
+    expect(style).toHaveValue('3');
+
+    await user.selectOptions(style, '0');
+
+    expect(changes.at(-1)).toContain('<p>Start</p>');
+  });
+
+  it('enables undo only once there is something to undo', async () => {
+    render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+    const user = userEvent.setup();
+
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    expect(undo).toBeDisabled();
+
+    // focus through the text rather than through a toolbar button. the button's
+    // own focus() is part of the same click, and whether it has landed by the
+    // time the keystroke arrives is not something to rely on
+    await user.click(await screen.findByText('Start'));
+    await user.keyboard('!');
+
+    expect(undo).toBeEnabled();
+  });
+
   describe('read only', () => {
     it('shows the content without a toolbar', async () => {
       render(<RichTextEditor content="<p>Theirs to read</p>" onChange={() => {}} readOnly />);

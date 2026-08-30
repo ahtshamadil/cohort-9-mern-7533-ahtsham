@@ -778,16 +778,39 @@
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   background-color: var(--surface-raised);
-  overflow: hidden;
+  /* clip rather than hidden. hidden would make this a scroll container, and the
+     sticky toolbar would then stick to a box that never scrolls */
+  overflow: clip;
 }
 
 .editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem;
   padding: 0.5rem;
   border-bottom: 1px solid var(--rule);
   background-color: var(--surface-sunken);
+}
+
+.editor-style {
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-raised);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8125rem;
+}
+
+.editor-tool-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.125rem 0.25rem;
+  background-color: var(--rule);
 }
 
 .editor-tool {
@@ -812,8 +835,16 @@
   color: var(--ink);
 }
 
+.editor-tool:disabled,
+.editor-tool:disabled:hover {
+  background: none;
+  color: var(--ink-subtle);
+  cursor: default;
+}
+
 .editor-body .tiptap {
-  min-height: 18rem;
+  /* a page rather than a box, so a long note is not written through a slot */
+  min-height: max(20rem, 60vh);
   padding: 1.125rem;
   outline: none;
 }
@@ -825,6 +856,60 @@
 .editor-body .tiptap ul,
 .editor-body .tiptap ol {
   padding-left: 1.25rem;
+}
+
+.editor-body .tiptap h1,
+.editor-body .tiptap h2,
+.editor-body .tiptap h3 {
+  font-family: var(--display);
+  line-height: 1.25;
+}
+
+.editor-body .tiptap h1 {
+  font-size: 1.5rem;
+}
+
+.editor-body .tiptap h2 {
+  font-size: 1.25rem;
+}
+
+.editor-body .tiptap h3 {
+  font-size: 1.0625rem;
+}
+
+.editor-body .tiptap blockquote {
+  padding-left: 0.875rem;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--ink-muted);
+}
+
+.editor-body .tiptap code {
+  padding: 0.0625rem 0.25rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+  font-family: var(--mono);
+  font-size: 0.875em;
+}
+
+.editor-body .tiptap pre {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-sunken);
+  overflow-x: auto;
+}
+
+.editor-body .tiptap pre code {
+  padding: 0;
+  background: none;
+}
+
+.editor-body .tiptap hr {
+  border: 0;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.editor-body .tiptap a {
+  color: var(--accent);
 }
 
 /* ---------- the two note lists ---------- */
