@@ -163,6 +163,89 @@ describe('RichTextEditor', () => {
     expect(undo).toBeEnabled();
   });
 
+  describe('links', () => {
+    /** Focuses the editor and selects the whole note, which needs no layout. */
+    async function selectAll(user: ReturnType<typeof userEvent.setup>, text: string) {
+      await user.click(await screen.findByText(text));
+      await user.keyboard('{Control>}a{/Control}');
+    }
+
+    it('wraps the selection in a link the toolbar asked for', async () => {
+      const changes: string[] = [];
+      render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+      const user = userEvent.setup();
+
+      await selectAll(user, 'Start');
+      await user.click(screen.getByRole('button', { name: 'Link' }));
+      await user.type(screen.getByRole('textbox', { name: 'Link address' }), 'https://example.com');
+      await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+      expect(changes.at(-1)).toContain('href="https://example.com"');
+      expect(screen.queryByRole('textbox', { name: 'Link address' })).not.toBeInTheDocument();
+    });
+
+    it('puts https in front of a bare domain', async () => {
+      const changes: string[] = [];
+      render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+      const user = userEvent.setup();
+
+      await selectAll(user, 'Start');
+      await user.click(screen.getByRole('button', { name: 'Link' }));
+      await user.type(screen.getByRole('textbox', { name: 'Link address' }), 'example.com');
+      await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+      // without this it is read as a path on this site rather than another one
+      expect(changes.at(-1)).toContain('href="https://example.com"');
+    });
+
+    it('refuses an address the sanitiser would drop', async () => {
+      const changes: string[] = [];
+      render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+      const user = userEvent.setup();
+
+      await selectAll(user, 'Start');
+      await user.click(screen.getByRole('button', { name: 'Link' }));
+      await user.type(screen.getByRole('textbox', { name: 'Link address' }), 'javascript:alert(1)');
+      await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(changes).toHaveLength(0);
+      // saying so beats writing a link the server would strip without a word
+      expect(screen.getByRole('textbox', { name: 'Link address' })).toBeInTheDocument();
+    });
+
+    it('takes a link back off', async () => {
+      const changes: string[] = [];
+      render(
+        <RichTextEditor
+          content='<p><a href="https://example.com">Start</a></p>'
+          onChange={(html) => changes.push(html)}
+        />,
+      );
+      const user = userEvent.setup();
+
+      await selectAll(user, 'Start');
+
+      const link = screen.getByRole('button', { name: 'Link' });
+      expect(link).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(link);
+      await user.click(screen.getByRole('button', { name: 'Remove link' }));
+
+      expect(changes.at(-1)).not.toContain('<a ');
+      expect(link).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('offers no way to remove a link where there is none', async () => {
+      render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('button', { name: 'Link' }));
+
+      expect(screen.queryByRole('button', { name: 'Remove link' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('read only', () => {
     it('shows the content without a toolbar', async () => {
       render(<RichTextEditor content="<p>Theirs to read</p>" onChange={() => {}} readOnly />);

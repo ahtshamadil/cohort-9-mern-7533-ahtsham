@@ -842,6 +842,33 @@
   cursor: default;
 }
 
+.editor-link-row {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.editor-link-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-raised);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.8125rem;
+}
+
+.editor-link-input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
 .editor-body .tiptap {
   /* a page rather than a box, so a long note is not written through a slot */
   min-height: max(20rem, 60vh);

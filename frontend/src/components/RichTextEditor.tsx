@@ -1,6 +1,6 @@
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface RichTextEditorProps {
   /** The HTML to show. Replaced in place when it changes. */
@@ -8,6 +8,31 @@ export interface RichTextEditorProps {
   onChange: (html: string) => void;
   /** Shows the note without letting it be changed, for a view-only share. */
   readOnly?: boolean;
+}
+
+/** The schemes the API's sanitiser keeps. A link written in anything else is dropped on save. */
+const linkSchemes = ['http:', 'https:', 'mailto:'];
+
+/**
+ * What was typed as a URL worth storing, or null if it is not one.
+ *
+ * A bare domain gets https:// put in front of it, because that is what people
+ * type and without it the browser reads it as a path on this site.
+ */
+function asHref(typed: string): string | null {
+  const trimmed = typed.trim();
+
+  if (trimmed === '') {
+    return null;
+  }
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return linkSchemes.includes(new URL(withScheme).protocol) ? withScheme : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The heading levels the toolbar offers, and paragraph as the absence of one. */
@@ -22,6 +47,12 @@ const levelNames: Record<(typeof levels)[number], string> = {
 
 /** The note body editor, with a formatting toolbar above it. */
 export function RichTextEditor({ content, onChange, readOnly = false }: RichTextEditorProps) {
+  // the link row, rather than window.prompt: a prompt blocks the browser, and
+  // jsdom answers it with undefined, so the feature could not be tested at all
+  const [linking, setLinking] = useState(false);
+  const [href, setHref] = useState('');
+  const [linkError, setLinkError] = useState(false);
+
   const editor = useEditor({
     // every mark and node here is one the API's sanitiser allows through. a
     // button writing a tag the server strips would lose the formatting on save
@@ -66,6 +97,7 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
       orderedList: current?.isActive('orderedList') ?? false,
       blockquote: current?.isActive('blockquote') ?? false,
       codeBlock: current?.isActive('codeBlock') ?? false,
+      link: current?.isActive('link') ?? false,
       canUndo: current?.can().undo() ?? false,
       canRedo: current?.can().redo() ?? false,
     }),
@@ -99,6 +131,38 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
   }
 
   const chain = () => editor.chain().focus();
+
+  /** Opens the row with whatever link is already on the selection, if any. */
+  function openLink() {
+    setHref((editor.getAttributes('link').href as string | undefined) ?? '');
+    setLinkError(false);
+    setLinking(true);
+  }
+
+  function closeLink() {
+    setLinking(false);
+    setLinkError(false);
+    setHref('');
+  }
+
+  function applyLink() {
+    const url = asHref(href);
+
+    if (url === null) {
+      setLinkError(true);
+      return;
+    }
+
+    // extendMarkRange so editing a link that is already there replaces the whole
+    // of it rather than half
+    chain().extendMarkRange('link').setLink({ href: url }).run();
+    closeLink();
+  }
+
+  function removeLink() {
+    chain().extendMarkRange('link').unsetLink().run();
+    closeLink();
+  }
 
   return (
     <div className="editor">
@@ -162,6 +226,19 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
         <button
           type="button"
           className="editor-tool"
+          title="Link (Ctrl+K)"
+          aria-pressed={active.link}
+          aria-expanded={linking}
+          onClick={() => (linking ? closeLink() : openLink())}
+        >
+          Link
+        </button>
+
+        <span className="editor-tool-divider" />
+
+        <button
+          type="button"
+          className="editor-tool"
           title="Undo (Ctrl+Z)"
           disabled={!active.canUndo}
           onClick={() => chain().undo().run()}
@@ -177,6 +254,51 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
         >
           Redo
         </button>
+
+        {linking && (
+          <div className="editor-link-row">
+            <label className="visually-hidden" htmlFor="editor-link">
+              Link address
+            </label>
+            <input
+              id="editor-link"
+              type="text"
+              className="editor-link-input"
+              value={href}
+              placeholder="https://example.com"
+              autoFocus
+              aria-invalid={linkError}
+              onChange={(event) => {
+                setHref(event.target.value);
+                setLinkError(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applyLink();
+                }
+
+                if (event.key === 'Escape') closeLink();
+              }}
+            />
+            <button type="button" className="editor-tool" onClick={applyLink}>
+              Apply
+            </button>
+            {active.link && (
+              <button type="button" className="editor-tool" onClick={removeLink}>
+                Remove link
+              </button>
+            )}
+            <button type="button" className="editor-tool" onClick={closeLink}>
+              Cancel
+            </button>
+            {linkError && (
+              <span className="field-error" role="alert">
+                That is not a web or email address.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <EditorContent editor={editor} className="editor-body" />
