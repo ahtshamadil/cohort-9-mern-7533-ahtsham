@@ -6,6 +6,11 @@ module.exports = {
   moduleNameMapper: {
     // jest cannot parse css, and the tests do not care about it either way
     '\\.css$': '<rootDir>/src/test/styleMock.cjs',
+    // there is no socket server behind jsdom, and reaching for one that is
+    // not there is noise in every suite that renders a screen. the double
+    // records the handlers a screen registers, so a test can push what the
+    // server would have sent
+    '/realtime/socket$': '<rootDir>/src/test/realtime.ts',
   },
   testMatch: ['<rootDir>/src/**/*.test.tsx', '<rootDir>/src/**/*.test.ts'],
   // comfortably longer than the 5s asyncUtilTimeout in jest.setup.ts. at the

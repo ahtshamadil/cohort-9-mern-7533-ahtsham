@@ -779,6 +779,15 @@
   color: var(--danger);
 }
 
+.editor-status.changed {
+  color: var(--accent);
+}
+
+.gone-back {
+  width: auto;
+  margin-top: 1.25rem;
+}
+
 .editor-bar-actions {
   display: flex;
   align-items: center;
