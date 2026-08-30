@@ -410,8 +410,52 @@ describe('NoteEditorPage', () => {
 
       // last write wins, and the person typing is told rather than finding out
       // when their words disappear under somebody else's
-      expect(await screen.findByText(/Changed by somebody else/)).toBeInTheDocument();
+      expect(await screen.findByText(/Somebody else changed this note/)).toBeInTheDocument();
       expect(screen.getByLabelText('Title')).toHaveValue('Mine');
+    });
+
+    it('leaves the notice up once the autosave has been and gone', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes/1': { status: 200, body: { note } },
+        'PATCH /api/notes/1': { status: 200, body: { note: { ...note, title: 'Mine' } } },
+      });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      const title = await screen.findByLabelText('Title');
+      await user.clear(title);
+      await user.type(title, 'Mine');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+      await screen.findByText(/Somebody else changed this note/);
+
+      // the save that follows is what used to clear this, which left the notice
+      // on screen for about a tenth of a second - long enough to pass a test and
+      // far too short for anybody to read
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      await screen.findByText('Saved');
+
+      expect(screen.getByText(/Somebody else changed this note/)).toBeInTheDocument();
+    });
+
+    it('takes the notice away when it is dismissed', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      const title = await screen.findByLabelText('Title');
+      await user.clear(title);
+      await user.type(title, 'Mine');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+      await screen.findByText(/Somebody else changed this note/);
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+      expect(screen.queryByText(/Somebody else changed this note/)).not.toBeInTheDocument();
     });
 
     it('ignores a change older than what is already shown', async () => {

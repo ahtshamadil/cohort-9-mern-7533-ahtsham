@@ -82,6 +82,10 @@ export function NoteEditorPage() {
 
     let cancelled = false;
 
+    // the notice belongs to the note it was raised on, and this screen is reused
+    // rather than remounted when the id changes
+    setChangedElsewhere(false);
+
     getNote(noteId)
       .then((note) => {
         if (cancelled) return;
@@ -172,7 +176,6 @@ export function NoteEditorPage() {
       }
 
       setStatus('saved');
-      setChangedElsewhere(false);
 
       return true;
     } catch (cause) {
@@ -271,8 +274,18 @@ export function NoteEditorPage() {
         </span>
 
         {changedElsewhere && (
-          <span className="editor-status changed" role="status">
-            Changed by somebody else. Saving keeps what you have written.
+          <span className="editor-changed">
+            <span role="status">
+              Somebody else changed this note while you were writing. What you have here is
+              what gets saved.
+            </span>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setChangedElsewhere(false)}
+            >
+              Dismiss
+            </button>
           </span>
         )}
 

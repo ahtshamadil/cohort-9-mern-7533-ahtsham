@@ -779,8 +779,22 @@
   color: var(--danger);
 }
 
-.editor-status.changed {
+/* its own row under the bar. it outlives the save that follows it, so it has to
+   sit somewhere it is not competing with the buttons for space */
+.editor-changed {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.editor-changed .button {
+  width: auto;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
 }
 
 .gone-back {
