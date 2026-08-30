@@ -939,6 +939,30 @@
   color: var(--accent);
 }
 
+/* the placeholder is drawn rather than typed, so it takes no room in the note */
+.editor-body .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--ink-subtle);
+  pointer-events: none;
+}
+
+.editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--rule);
+  background-color: var(--surface-sunken);
+  font-size: 0.75rem;
+}
+
+.editor-limit {
+  color: var(--accent);
+}
+
 /* ---------- the two note lists ---------- */
 
 .notes-tabs {

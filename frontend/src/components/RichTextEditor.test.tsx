@@ -163,6 +163,61 @@ describe('RichTextEditor', () => {
     expect(undo).toBeEnabled();
   });
 
+  describe('the size of a note', () => {
+    it('counts the words and characters it was given', async () => {
+      render(<RichTextEditor content="<p>Two words</p>" onChange={() => {}} />);
+
+      expect(await screen.findByText('2 words, 9 characters')).toBeInTheDocument();
+    });
+
+    it('counts one word without an s on the end', async () => {
+      render(<RichTextEditor content="<p>Alone</p>" onChange={() => {}} />);
+
+      expect(await screen.findByText('1 word, 5 characters')).toBeInTheDocument();
+    });
+
+    it('counts up as the note is typed into', async () => {
+      render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByText('Start'));
+      await user.keyboard('!!');
+
+      expect(await screen.findByText('1 word, 7 characters')).toBeInTheDocument();
+    });
+
+    it('warns before a note is too large to save', async () => {
+      // the API refuses content past 1,000,000 bytes, and the warning is meant to
+      // arrive while there is still something to be done about it. these are three
+      // bytes each, so 310,000 of them is a note far shorter than the cap in
+      // characters and nearly at it in what actually gets stored
+      const long = `<p>${'字'.repeat(310_000)}</p>`;
+      render(<RichTextEditor content={long} onChange={() => {}} />);
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'nearly as large as one note can be',
+      );
+    });
+
+    it('says nothing about the size of an ordinary note', async () => {
+      render(<RichTextEditor content="<p>Short</p>" onChange={() => {}} />);
+      await screen.findByText('1 word, 5 characters');
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('prompts an empty note rather than leaving it blank', async () => {
+      const { container } = render(<RichTextEditor content="" onChange={() => {}} />);
+
+      await screen.findByText('0 words, 0 characters');
+
+      expect(container.querySelector('.tiptap p')).toHaveAttribute(
+        'data-placeholder',
+        'Start writing...',
+      );
+    });
+  });
+
   describe('links', () => {
     /** Focuses the editor and selects the whole note, which needs no layout. */
     async function selectAll(user: ReturnType<typeof userEvent.setup>, text: string) {

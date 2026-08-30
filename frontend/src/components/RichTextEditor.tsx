@@ -1,3 +1,4 @@
+import { CharacterCount, Placeholder } from '@tiptap/extensions';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useState } from 'react';
@@ -35,6 +36,28 @@ function asHref(typed: string): string | null {
   }
 }
 
+/** The most content the API stores in one note, in bytes. Past this a save is a 400. */
+const contentLimitBytes = 1_000_000;
+
+/** How full a note has to be before it is worth saying so. */
+const warnAtBytes = contentLimitBytes * 0.9;
+
+/**
+ * Whether the note is close enough to the cap to warn about.
+ *
+ * Bytes rather than characters, because bytes are what the API counts. UTF-8
+ * never needs more than three per JavaScript character, so anything short enough
+ * is under the cap without being encoded to find out.
+ */
+function nearTheLimit(html: string): boolean {
+  return html.length * 3 >= warnAtBytes && new TextEncoder().encode(html).length >= warnAtBytes;
+}
+
+/** "1 word" rather than "1 words". */
+function counted(total: number, noun: string): string {
+  return `${total.toLocaleString()} ${noun}${total === 1 ? '' : 's'}`;
+}
+
 /** The heading levels the toolbar offers, and paragraph as the absence of one. */
 const levels = [0, 1, 2, 3] as const;
 
@@ -52,15 +75,23 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
   const [linking, setLinking] = useState(false);
   const [href, setHref] = useState('');
   const [linkError, setLinkError] = useState(false);
+  const [full, setFull] = useState(false);
 
   const editor = useEditor({
     // every mark and node here is one the API's sanitiser allows through. a
     // button writing a tag the server strips would lose the formatting on save
-    extensions: [StarterKit.configure({ link: { openOnClick: false } })],
+    extensions: [
+      StarterKit.configure({ link: { openOnClick: false } }),
+      CharacterCount,
+      Placeholder.configure({ placeholder: 'Start writing...' }),
+    ],
     content,
     editable: !readOnly,
     onUpdate: ({ editor: changed }) => {
-      onChange(changed.getHTML());
+      const html = changed.getHTML();
+
+      setFull(nearTheLimit(html));
+      onChange(html);
     },
   });
 
@@ -71,6 +102,12 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
   useEffect(() => {
     editor?.setEditable(!readOnly, false);
   }, [editor, readOnly]);
+
+  // covers the first render and a switch to another note. typing is covered by
+  // onUpdate, which already holds the html this would otherwise ask for again
+  useEffect(() => {
+    setFull(nearTheLimit(content));
+  }, [content]);
 
   // switching to another note changes this prop without unmounting, and useEditor
   // only reads content once. without this the previous note's body stays on
@@ -98,6 +135,8 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
       blockquote: current?.isActive('blockquote') ?? false,
       codeBlock: current?.isActive('codeBlock') ?? false,
       link: current?.isActive('link') ?? false,
+      characters: current?.storage.characterCount.characters() ?? 0,
+      words: current?.storage.characterCount.words() ?? 0,
       canUndo: current?.can().undo() ?? false,
       canRedo: current?.can().redo() ?? false,
     }),
@@ -302,6 +341,19 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
       </div>
 
       <EditorContent editor={editor} className="editor-body" />
+
+      <div className="editor-footer">
+        <span className="muted">
+          {counted(active.words, 'word')}, {counted(active.characters, 'character')}
+        </span>
+
+        {full && (
+          <span className="editor-limit" role="status">
+            This note is nearly as large as one note can be. Splitting it in two beats
+            finding out on a failed save.
+          </span>
+        )}
+      </div>
     </div>
   );
 }
