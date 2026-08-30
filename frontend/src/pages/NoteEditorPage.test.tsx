@@ -106,7 +106,9 @@ describe('NoteEditorPage', () => {
     expect(await screen.findByRole('alert', undefined, { timeout: 4000 })).toHaveTextContent(
       'Could not save',
     );
-    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    // a failed save reads exactly like a saved one unless it is marked, which is
+    // the one line of the status row that must never be misread
+    expect(screen.getByText('Not saved')).toHaveClass('failed');
     expect(screen.getByLabelText('Title')).toHaveValue('Shopping!');
   });
 

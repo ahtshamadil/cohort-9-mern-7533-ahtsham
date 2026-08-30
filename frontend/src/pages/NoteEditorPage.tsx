@@ -175,7 +175,9 @@ export function NoteEditorPage() {
   if (loading) {
     return (
       <main className="app-main">
-        <p className="muted">Loading...</p>
+        <div className="empty-state">
+          <p>Loading this note...</p>
+        </div>
       </main>
     );
   }
@@ -187,7 +189,10 @@ export function NoteEditorPage() {
           Back
         </button>
 
-        <span className="muted" role="status">
+        <span
+          className={status === 'failed' && !readOnly ? 'editor-status failed' : 'editor-status'}
+          role="status"
+        >
           {readOnly ? 'View only' : wording[status]}
         </span>
 

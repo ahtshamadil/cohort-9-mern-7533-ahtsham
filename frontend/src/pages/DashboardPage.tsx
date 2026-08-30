@@ -402,7 +402,11 @@ export function DashboardPage() {
           </nav>
         )}
 
-        {notes === null && error === null && <p className="muted">Loading your notes...</p>}
+        {notes === null && error === null && (
+          <div className="empty-state">
+            <p>{mine ? 'Loading your notes...' : 'Loading the notes shared with you...'}</p>
+          </div>
+        )}
       </main>
     </div>
   );

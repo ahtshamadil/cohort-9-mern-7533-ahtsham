@@ -767,6 +767,17 @@
   margin-bottom: 1.25rem;
 }
 
+.editor-status {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+}
+
+/* a failed save reads exactly like a saved one otherwise, which is the one
+   reading of the status row that must never be wrong */
+.editor-status.failed {
+  color: var(--danger);
+}
+
 .editor-bar-actions {
   display: flex;
   align-items: center;

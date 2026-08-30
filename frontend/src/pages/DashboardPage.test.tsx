@@ -457,6 +457,24 @@ describe('DashboardPage', () => {
 
     const shared = { status: 200, body: { notes: [theirs], total: 1 } };
 
+    it('names what it is loading on whichever list is open', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': both,
+        'GET /api/notes/shared?page=1&limit=20': { ...shared, delayMs: 300 },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await screen.findByRole('heading', { name: 'Shopping' });
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      // the two lists were written at different times and said the same thing
+      // while waiting, which was only ever right for one of them
+      expect(screen.getByText('Loading the notes shared with you...')).toBeInTheDocument();
+    });
+
     it('starts on your own notes rather than the shared ones', async () => {
       stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } } });
 
