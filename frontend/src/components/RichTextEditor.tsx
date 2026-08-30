@@ -1,4 +1,5 @@
 import { CharacterCount, Placeholder } from '@tiptap/extensions';
+import TextAlign from '@tiptap/extension-text-align';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useState } from 'react';
@@ -75,6 +76,10 @@ const paths = {
     'M9 5H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2a2 2 0 0 1-2 2H5M19 5h-3a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2a2 2 0 0 1-2 2h-1',
   codeBlock: 'M16 18l5-6-5-6M8 6l-5 6 5 6',
   link: 'M15 7h3a5 5 0 0 1 0 10h-3M9 7H6a5 5 0 0 0 0 10h3M8 12h8',
+  alignLeft: 'M4 6h16M4 12h10M4 18h13',
+  alignCenter: 'M4 6h16M7 12h10M6 18h12',
+  alignRight: 'M4 6h16M10 12h10M7 18h13',
+  alignJustify: 'M4 6h16M4 12h16M4 18h16',
 } as const;
 
 /**
@@ -100,7 +105,11 @@ type Label =
   | 'Numbered list'
   | 'Quote'
   | 'Code block'
-  | 'Link';
+  | 'Link'
+  | 'Align left'
+  | 'Align centre'
+  | 'Align right'
+  | 'Justify';
 
 const controls: Control[] = [
   { kind: 'tool', label: 'Heading 1', shortcut: 'Ctrl+Alt+1', text: 'H1' },
@@ -116,6 +125,11 @@ const controls: Control[] = [
   { kind: 'tool', label: 'Numbered list', shortcut: 'Ctrl+Shift+7', icon: 'orderedList' },
   { kind: 'tool', label: 'Quote', shortcut: 'Ctrl+Shift+B', icon: 'quote' },
   { kind: 'tool', label: 'Code block', shortcut: 'Ctrl+Alt+C', icon: 'codeBlock' },
+  { kind: 'divider' },
+  { kind: 'tool', label: 'Align left', shortcut: 'Ctrl+Shift+L', icon: 'alignLeft' },
+  { kind: 'tool', label: 'Align centre', shortcut: 'Ctrl+Shift+E', icon: 'alignCenter' },
+  { kind: 'tool', label: 'Align right', shortcut: 'Ctrl+Shift+R', icon: 'alignRight' },
+  { kind: 'tool', label: 'Justify', shortcut: 'Ctrl+Shift+J', icon: 'alignJustify' },
   { kind: 'divider' },
   { kind: 'tool', label: 'Link', shortcut: 'Ctrl+K', icon: 'link' },
 ];
@@ -135,6 +149,9 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
     // formatting on save
     extensions: [
       StarterKit.configure({ link: { openOnClick: false } }),
+      // only the blocks the sanitiser lets carry a style attribute. aligning
+      // anything else would be dropped on save without a word
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       CharacterCount,
       Placeholder.configure({ placeholder: 'Start writing...' }),
     ],
@@ -189,6 +206,12 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
       Quote: current?.isActive('blockquote') ?? false,
       'Code block': current?.isActive('codeBlock') ?? false,
       Link: current?.isActive('link') ?? false,
+      // left is what an unaligned block renders as, so it reads as pressed
+      // until one of the others is chosen
+      'Align left': current?.isActive({ textAlign: 'left' }) ?? false,
+      'Align centre': current?.isActive({ textAlign: 'center' }) ?? false,
+      'Align right': current?.isActive({ textAlign: 'right' }) ?? false,
+      Justify: current?.isActive({ textAlign: 'justify' }) ?? false,
     }),
   });
 
@@ -271,6 +294,14 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
         return chain().toggleBlockquote().run();
       case 'Code block':
         return chain().toggleCodeBlock().run();
+      case 'Align left':
+        return chain().setTextAlign('left').run();
+      case 'Align centre':
+        return chain().setTextAlign('center').run();
+      case 'Align right':
+        return chain().setTextAlign('right').run();
+      case 'Justify':
+        return chain().setTextAlign('justify').run();
       default:
         return linking ? closeLink() : openLink();
     }

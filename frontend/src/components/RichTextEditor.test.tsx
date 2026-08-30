@@ -99,6 +99,10 @@ describe('RichTextEditor', () => {
       'Numbered list',
       'Quote',
       'Code block',
+      'Align left',
+      'Align centre',
+      'Align right',
+      'Justify',
       'Link',
     ]) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
@@ -223,6 +227,60 @@ describe('RichTextEditor', () => {
       expect(container.querySelector('.tiptap p')).toHaveAttribute(
         'data-placeholder',
         'Start writing...',
+      );
+    });
+  });
+
+  describe('alignment', () => {
+    it.each([
+      ['Align centre', 'center'],
+      ['Align right', 'right'],
+      ['Justify', 'justify'],
+    ])('%s writes text-align:%s', async (label, value) => {
+      const changes: string[] = [];
+      render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByText('Start'));
+      await user.click(screen.getByRole('button', { name: label }));
+
+      // the value is what the sanitiser matches on. the spacing is not: the
+      // editor writes "text-align: center;" and the server stores it back as
+      // "text-align:center", and both have to be read as the same thing
+      const written = (changes.at(-1) ?? '').replace(/\s*:\s*/g, ':');
+
+      expect(written).toContain(`text-align:${value}`);
+    });
+
+    it('shows which alignment the block is on', async () => {
+      render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByText('Start'));
+
+      const centre = screen.getByRole('button', { name: 'Align centre' });
+      expect(centre).toHaveAttribute('aria-pressed', 'false');
+
+      await user.click(centre);
+
+      expect(centre).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Align left' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+
+    it('reads an alignment back in the form the server stores it', async () => {
+      // no space and no semicolon - this is what comes back out of sanitiseHtml,
+      // and it is what the editor is handed on every load after the first save
+      render(
+        <RichTextEditor content='<p style="text-align:right">Start</p>' onChange={() => {}} />,
+      );
+      await screen.findByText('Start');
+
+      expect(screen.getByRole('button', { name: 'Align right' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
       );
     });
   });
