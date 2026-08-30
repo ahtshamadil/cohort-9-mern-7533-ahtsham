@@ -81,34 +81,41 @@ describe('RichTextEditor', () => {
     expect(changes).toHaveLength(0);
   });
 
-  it('offers a toggle for every mark and block the sanitiser allows', async () => {
+  it('names every icon button, and offers only the trimmed set', async () => {
     render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
     await screen.findByText('Start');
 
-    // each of these writes a tag the API's allow-list already accepts. a button
-    // for anything else would lose its formatting the moment the note was saved
+    // the buttons carry an icon and no text, so the name comes from aria-label.
+    // getByRole finding them at all is the accessible name being right
     for (const label of [
+      'Heading 1',
+      'Heading 2',
+      'Heading 3',
       'Bold',
       'Italic',
       'Underline',
-      'Strike',
-      'Code',
+      'Strikethrough',
       'Bullet list',
       'Numbered list',
       'Quote',
       'Code block',
+      'Link',
     ]) {
-      expect(screen.getByRole('button', { name: label })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
+
+    // dropped on purpose - their shortcuts still work, they just do not earn a
+    // place in the row
+    for (const gone of ['Divider', 'Undo', 'Redo', 'Code']) {
+      expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
+    }
+
+    expect(screen.queryByRole('combobox', { name: 'Text style' })).not.toBeInTheDocument();
   });
 
   it.each([
     ['Underline', '<u>Start</u>'],
-    ['Strike', '<s>Start</s>'],
-    ['Code', '<code>Start</code>'],
+    ['Strikethrough', '<s>Start</s>'],
     ['Quote', '<blockquote><p>Start</p></blockquote>'],
     ['Code block', '<pre><code>Start</code></pre>'],
   ])('writes %s as %s', async (label, markup) => {
@@ -129,38 +136,40 @@ describe('RichTextEditor', () => {
     expect(changes.at(-1)).toContain(markup);
   });
 
-  it('changes the block to the heading level the style select asks for', async () => {
+  it('turns a block into a heading and back off again', async () => {
     const changes: string[] = [];
     render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
     const user = userEvent.setup();
 
-    const style = await screen.findByRole('combobox', { name: 'Text style' });
-    expect(style).toHaveValue('0');
+    // a caret in the block rather than a full-document selection. heading is a
+    // block toggle, and isActive reads false across a selection spanning the doc
+    await user.click(await screen.findByText('Start'));
 
-    await user.selectOptions(style, '3');
+    const heading = screen.getByRole('button', { name: 'Heading 2' });
+    expect(heading).toHaveAttribute('aria-pressed', 'false');
 
-    expect(changes.at(-1)).toContain('<h3>Start</h3>');
-    expect(style).toHaveValue('3');
+    await user.click(heading);
 
-    await user.selectOptions(style, '0');
+    expect(changes.at(-1)).toContain('<h2>Start</h2>');
+    expect(heading).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(heading);
 
     expect(changes.at(-1)).toContain('<p>Start</p>');
   });
 
-  it('enables undo only once there is something to undo', async () => {
-    render(<RichTextEditor content="<p>Start</p>" onChange={() => {}} />);
+  it('keeps the shortcuts for what the toolbar no longer shows', async () => {
+    const changes: string[] = [];
+    render(<RichTextEditor content="<p>Start</p>" onChange={(html) => changes.push(html)} />);
     const user = userEvent.setup();
 
-    const undo = await screen.findByRole('button', { name: 'Undo' });
-    expect(undo).toBeDisabled();
-
-    // focus through the text rather than through a toolbar button. the button's
-    // own focus() is part of the same click, and whether it has landed by the
-    // time the keystroke arrives is not something to rely on
     await user.click(await screen.findByText('Start'));
-    await user.keyboard('!');
+    await user.keyboard('{Control>}a{/Control}');
 
-    expect(undo).toBeEnabled();
+    // inline code lost its button, not its keystroke. same for undo on Ctrl+Z
+    await user.keyboard('{Control>}e{/Control}');
+
+    expect(changes.at(-1)).toContain('<code>Start</code>');
   });
 
   describe('the size of a note', () => {
