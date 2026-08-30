@@ -1,3 +1,4 @@
+import { socketId } from '../realtime/socket';
 import { restoreFetch, stubApi } from '../test/harness';
 import {
   canEdit,
@@ -8,8 +9,13 @@ import {
   plainText,
   shareNote,
   unshareNote,
+  updateNote,
   type Note,
 } from './notes';
+
+jest.mock('../realtime/socket', () => ({ socketId: jest.fn() }));
+
+const connected = socketId as jest.MockedFunction<typeof socketId>;
 
 // the stub rejects any key it was not given, so a wrong url fails as a rejection
 // rather than needing a spy on fetch to assert against
@@ -85,6 +91,45 @@ describe('listSharedNotes', () => {
       notes: [],
       total: 0,
     });
+  });
+});
+
+describe('updateNote', () => {
+  afterEach(restoreFetch);
+
+  const saved = {
+    id: 1,
+    title: 'Shopping',
+    content: '<p>Milk</p>',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-02T00:00:00.000Z',
+    owner: { id: 1, email: 'ahtsham@example.com', name: null },
+    permission: 'owner' as const,
+  };
+
+  /** What the stub was called with, so the headers can be read back. */
+  function sent(): RequestInit {
+    return (globalThis.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
+  }
+
+  it('names the socket that saved so the server can leave it out', async () => {
+    connected.mockReturnValue('abc123');
+    stubApi({ 'PATCH /api/notes/1': { status: 200, body: { note: saved } } });
+
+    await updateNote(1, { title: 'Shopping' });
+
+    // without this the save comes straight back as an update and lands on top of
+    // whatever has been typed since it went out
+    expect(sent().headers).toMatchObject({ 'x-socket-id': 'abc123' });
+  });
+
+  it('sends no socket header before there is a socket', async () => {
+    connected.mockReturnValue(undefined);
+    stubApi({ 'PATCH /api/notes/1': { status: 200, body: { note: saved } } });
+
+    await updateNote(1, { title: 'Shopping' });
+
+    expect(sent().headers).not.toHaveProperty('x-socket-id');
   });
 });
 

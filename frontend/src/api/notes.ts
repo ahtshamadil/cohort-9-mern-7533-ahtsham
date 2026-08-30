@@ -1,3 +1,4 @@
+import { socketId } from '../realtime/socket';
 import { apiFetch, apiRequest } from './client';
 
 /** An account as another one sees it, on a note they own or were shared. */
@@ -142,9 +143,15 @@ export async function createNote(input: NoteInput): Promise<Note> {
 
 /** Changes the fields it is given and leaves the rest alone. */
 export async function updateNote(id: number, input: Partial<NoteInput>): Promise<Note> {
+  const from = socketId();
+
   const { note } = await apiFetch<{ note: Note }>(`/api/notes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
+    // names the socket that saved, so the server leaves it out of the broadcast.
+    // the server only honours an id belonging to the account that saved, so a
+    // missing header costs an echo and a wrong one costs nothing
+    headers: from === undefined ? {} : { 'x-socket-id': from },
   });
 
   return note;
