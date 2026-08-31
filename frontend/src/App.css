@@ -827,6 +827,121 @@
   padding-left: 1.25rem;
 }
 
+/* ---------- the two note lists ---------- */
+
+.notes-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.notes-tab {
+  padding: 0.625rem 0.125rem;
+  margin-right: 1.5rem;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  /* the underline is on the tab itself rather than a sliding marker, so it
+     lands in the right place before any layout has been measured */
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+
+.notes-tab:hover {
+  color: var(--ink);
+}
+
+.notes-tab-current {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- sharing ---------- */
+
+.share-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgb(0 0 0 / 45%);
+}
+
+.share-dialog {
+  width: min(28rem, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.share-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.share-heading h2 {
+  font-size: 1.25rem;
+}
+
+.share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* .button is full width for the auth forms, which is not what a dialog wants */
+.share-submit {
+  width: auto;
+  align-self: flex-start;
+}
+
+.share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.share-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.share-person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.share-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-title-read {
+  margin-bottom: 1rem;
+}
+
 @media (max-width: 40rem) {
   .app-main {
     padding: 2rem 1rem;

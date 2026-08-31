@@ -80,4 +80,30 @@ describe('RichTextEditor', () => {
     // write the incoming note straight back out again
     expect(changes).toHaveLength(0);
   });
+
+  describe('read only', () => {
+    it('shows the content without a toolbar', async () => {
+      render(<RichTextEditor content="<p>Theirs to read</p>" onChange={() => {}} readOnly />);
+
+      expect(await screen.findByText('Theirs to read')).toBeInTheDocument();
+      expect(screen.queryByRole('toolbar', { name: 'Formatting' })).not.toBeInTheDocument();
+    });
+
+    it('does not let the text be typed into', async () => {
+      const changes: string[] = [];
+      render(
+        <RichTextEditor
+          content="<p>Theirs to read</p>"
+          onChange={(html) => changes.push(html)}
+          readOnly
+        />,
+      );
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByText('Theirs to read'));
+      await user.keyboard('!!');
+
+      expect(changes).toHaveLength(0);
+    });
+  });
 });

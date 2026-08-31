@@ -1,5 +1,18 @@
 import { apiFetch, apiRequest } from './client';
 
+/** An account as another one sees it, on a note they own or were shared. */
+export interface UserSummary {
+  id: number;
+  email: string;
+  name: string | null;
+}
+
+/** What a share grants. */
+export type SharePermission = 'view' | 'edit';
+
+/** What this account may do with a note. Owning it outranks any share. */
+export type NotePermission = 'owner' | SharePermission;
+
 /** A note as the API describes one. The dates arrive as ISO strings. */
 export interface Note {
   id: number;
@@ -7,6 +20,26 @@ export interface Note {
   content: string;
   createdAt: string;
   updatedAt: string;
+  owner: UserSummary;
+  permission: NotePermission;
+}
+
+/** One account a note is shared with, as its owner sees it listed. */
+export interface Share {
+  user: UserSummary;
+  permission: SharePermission;
+  createdAt: string;
+}
+
+/** A page of notes, and how many the filter matched in total. */
+export interface NoteList {
+  notes: Note[];
+  total: number;
+}
+
+/** True if this note may be written to, rather than only read. */
+export function canEdit(note: Note): boolean {
+  return note.permission !== 'view';
 }
 
 export interface NoteInput {
@@ -26,8 +59,8 @@ export interface NoteQuery {
 /** The API's own default, so it is left out of the URL rather than sent back to it. */
 const defaultSort: NoteSort = 'recent';
 
-/** The user's notes, filtered by the search term and in the order asked for. */
-export async function listNotes(query: NoteQuery = {}): Promise<Note[]> {
+/** Builds the query string both lists share, leaving out what the API defaults to. */
+function listSearch(query: NoteQuery): string {
   const params = new URLSearchParams();
   const term = query.q?.trim() ?? '';
 
@@ -40,11 +73,44 @@ export async function listNotes(query: NoteQuery = {}): Promise<Note[]> {
   }
 
   const search = params.toString();
-  const { notes } = await apiFetch<{ notes: Note[] }>(
-    search === '' ? '/api/notes' : `/api/notes?${search}`,
-  );
 
-  return notes;
+  return search === '' ? '' : `?${search}`;
+}
+
+/** The user's own notes, filtered by the search term and in the order asked for. */
+export function listNotes(query: NoteQuery = {}): Promise<NoteList> {
+  return apiFetch<NoteList>(`/api/notes${listSearch(query)}`);
+}
+
+/** The notes other accounts have shared with this one. */
+export function listSharedNotes(query: NoteQuery = {}): Promise<NoteList> {
+  return apiFetch<NoteList>(`/api/notes/shared${listSearch(query)}`);
+}
+
+/** Who a note is shared with. Only its owner may ask. */
+export async function listShares(id: number): Promise<Share[]> {
+  const { shares } = await apiFetch<{ shares: Share[] }>(`/api/notes/${id}/shares`);
+
+  return shares;
+}
+
+/** Shares a note with the account at that address, or changes what it grants. */
+export async function shareNote(
+  id: number,
+  email: string,
+  permission: SharePermission,
+): Promise<Share> {
+  const { share } = await apiFetch<{ share: Share }>(`/api/notes/${id}/shares`, {
+    method: 'POST',
+    body: JSON.stringify({ email, permission }),
+  });
+
+  return share;
+}
+
+/** Takes a share back. The owner may remove anyone, a reader only themselves. */
+export function unshareNote(id: number, userId: number): Promise<void> {
+  return apiFetch<void>(`/api/notes/${id}/shares/${userId}`, { method: 'DELETE' });
 }
 
 /** One note. Throws a 404 ApiError if it belongs to somebody else. */
@@ -169,7 +235,7 @@ export function notesToText(notes: Note[]): string {
 /** Downloads every note as a plain text file meant to be read, not imported. */
 export async function exportNotesAsText(): Promise<void> {
   // no query, so this is every note rather than whatever the list is filtered to
-  const notes = await listNotes();
+  const { notes } = await listNotes();
 
   download(new Blob([notesToText(notes)], { type: 'text/plain' }), `slate-notes-${today()}.txt`);
 }

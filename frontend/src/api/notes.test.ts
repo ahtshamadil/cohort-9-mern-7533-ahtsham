@@ -1,5 +1,15 @@
 import { restoreFetch, stubApi } from '../test/harness';
-import { listNotes, notesToText, plainText, type Note } from './notes';
+import {
+  canEdit,
+  listSharedNotes,
+  listShares,
+  listNotes,
+  notesToText,
+  plainText,
+  shareNote,
+  unshareNote,
+  type Note,
+} from './notes';
 
 // the stub rejects any key it was not given, so a wrong url fails as a rejection
 // rather than needing a spy on fetch to assert against
@@ -7,21 +17,96 @@ describe('listNotes', () => {
   afterEach(restoreFetch);
 
   it('asks for nothing extra when nothing is asked for', async () => {
-    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [] } } });
+    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
 
-    await expect(listNotes()).resolves.toEqual([]);
+    await expect(listNotes()).resolves.toEqual({ notes: [], total: 0 });
   });
 
   it('leaves out a blank search and the default sort', async () => {
-    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [] } } });
+    stubApi({ 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
 
-    await expect(listNotes({ q: '   ', sort: 'recent' })).resolves.toEqual([]);
+    await expect(listNotes({ q: '   ', sort: 'recent' })).resolves.toEqual({
+      notes: [],
+      total: 0,
+    });
   });
 
   it('sends the search and the sort when they are asked for', async () => {
-    stubApi({ 'GET /api/notes?q=milk&sort=title': { status: 200, body: { notes: [] } } });
+    stubApi({ 'GET /api/notes?q=milk&sort=title': { status: 200, body: { notes: [], total: 0 } } });
 
-    await expect(listNotes({ q: ' milk ', sort: 'title' })).resolves.toEqual([]);
+    await expect(listNotes({ q: ' milk ', sort: 'title' })).resolves.toEqual({
+      notes: [],
+      total: 0,
+    });
+  });
+});
+
+describe('listSharedNotes', () => {
+  afterEach(restoreFetch);
+
+  it('asks the shared route rather than the owned one', async () => {
+    stubApi({ 'GET /api/notes/shared': { status: 200, body: { notes: [], total: 0 } } });
+
+    await expect(listSharedNotes()).resolves.toEqual({ notes: [], total: 0 });
+  });
+
+  it('carries the search and the sort across to it', async () => {
+    stubApi({
+      'GET /api/notes/shared?q=milk&sort=title': { status: 200, body: { notes: [], total: 0 } },
+    });
+
+    await expect(listSharedNotes({ q: 'milk', sort: 'title' })).resolves.toEqual({
+      notes: [],
+      total: 0,
+    });
+  });
+});
+
+describe('the share calls', () => {
+  afterEach(restoreFetch);
+
+  const share = {
+    user: { id: 2, email: 'someone@example.com', name: null },
+    permission: 'view' as const,
+    createdAt: '2026-08-05T00:00:00.000Z',
+  };
+
+  it('reads who a note is shared with', async () => {
+    stubApi({ 'GET /api/notes/1/shares': { status: 200, body: { shares: [share] } } });
+
+    await expect(listShares(1)).resolves.toEqual([share]);
+  });
+
+  it('shares a note and hands back the share that was made', async () => {
+    stubApi({ 'POST /api/notes/1/shares': { status: 201, body: { share } } });
+
+    await expect(shareNote(1, 'someone@example.com', 'view')).resolves.toEqual(share);
+  });
+
+  it('unshares by the user id, and reads nothing from the 204', async () => {
+    stubApi({ 'DELETE /api/notes/1/shares/2': { status: 204 } });
+
+    await expect(unshareNote(1, 2)).resolves.toBeUndefined();
+  });
+});
+
+describe('canEdit', () => {
+  const note = {
+    id: 1,
+    title: 'Shopping',
+    content: '',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-02T00:00:00.000Z',
+    owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  };
+
+  it('lets an owner and an edit share write', () => {
+    expect(canEdit({ ...note, permission: 'owner' })).toBe(true);
+    expect(canEdit({ ...note, permission: 'edit' })).toBe(true);
+  });
+
+  it('does not let a view share write', () => {
+    expect(canEdit({ ...note, permission: 'view' })).toBe(false);
   });
 });
 
@@ -56,6 +141,8 @@ describe('notesToText', () => {
     content: '<p>Milk and bread</p><p>Then home</p>',
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-02T00:00:00.000Z',
+    owner: { id: 1, email: 'ahtsham@example.com', name: null },
+    permission: 'owner',
   };
 
   it('heads each note with a rule, its title and its date', () => {
