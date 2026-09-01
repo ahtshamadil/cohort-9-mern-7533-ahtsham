@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 
-export function AccountMenu({ name }: { name: string }) {
+export function AccountMenu({ name }: Readonly<{ name: string }>) {
   const [open, setOpen] = useState(false);
   const [changing, setChanging] = useState(false);
 

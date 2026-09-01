@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { SyntheticEvent } from 'react';
 
 import { ApiError, byField, changePassword, maxPasswordLength } from '../api/client';
 import { FormField } from '../pages/FormField';
 
-export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+export function ChangePasswordDialog({ onClose }: Readonly<{ onClose: () => void }>) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -33,7 +33,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setFormError(null);
