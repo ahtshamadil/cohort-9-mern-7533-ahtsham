@@ -3,10 +3,11 @@ import type { Server as HttpServer } from 'node:http';
 import cookieParser from 'cookie-parser';
 import { Server, type Socket } from 'socket.io';
 
+import { sessionIsCurrent } from '../services/authService.js';
 import { canReadNote, type Note } from '../services/notesService.js';
 import { AUTH_COOKIE } from '../utils/authCookie.js';
 import { logger } from '../utils/logger.js';
-import { verifySession } from '../utils/token.js';
+import { readToken } from '../utils/token.js';
 
 /**
  * Where the socket server listens.
@@ -83,12 +84,20 @@ function readNoteId(payload: unknown): number | null {
   return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
 }
 
-/** Refuses the handshake unless it carries a valid session cookie. */
-function authenticate(socket: NoteSocket, next: (err?: Error) => void): void {
+/** Refuses the handshake unless it carries a valid, current session cookie. */
+async function authenticate(socket: NoteSocket, next: (err?: Error) => void): Promise<void> {
   // io.engine.use(cookieParser()) has already run over the handshake request
   const cookies = (socket.request as { cookies?: Record<string, string> }).cookies;
   const token = cookies?.[AUTH_COOKIE];
-  const session = token === undefined ? null : verifySession(token);
+  const session = token === undefined ? null : readToken(token);
+
+  // the same check the http guard makes, so a password change closes the
+  // sockets its old tokens opened rather than leaving them listening
+  if (session !== null && !(await sessionIsCurrent(session))) {
+    logger.warn({ userId: session.userId }, 'Socket refused a withdrawn session');
+    next(new Error('Authentication required'));
+    return;
+  }
 
   if (session === null) {
     logger.warn({ address: socket.handshake.address }, 'Socket refused without a session');
@@ -229,13 +238,33 @@ export function shareRevoked(userId: number, noteId: number): void {
   io.in(userRoom(userId)).socketsLeave(noteRoom(noteId));
 }
 
+/**
+ * Drops the sockets an account already has open.
+ *
+ * The handshake checks the token version, but only once. A socket that was
+ * authenticated before a password change would otherwise keep working on the
+ * withdrawn session until its token expired.
+ */
+export function sessionsWithdrawn(userId: number): void {
+  if (io === null) {
+    return;
+  }
+
+  io.in(userRoom(userId)).disconnectSockets(true);
+}
+
 /** Starts the socket server on the same http server the API is served from. */
 export function attachRealtime(server: HttpServer): NoteServer {
   const created: NoteServer = new Server(server, { path: realtimePath });
 
   // the same parser app.ts mounts, so the session cookie is read one way only
   created.engine.use(cookieParser());
-  created.use((socket, next) => authenticate(socket, next));
+  created.use((socket, next) => {
+    authenticate(socket, next).catch((cause: unknown) => {
+      logger.error({ err: cause }, 'Socket authentication failed');
+      next(new Error('Authentication required'));
+    });
+  });
 
   created.on('connection', (socket) => {
     socket.join(userRoom(socket.data.userId));

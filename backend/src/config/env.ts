@@ -52,6 +52,17 @@ function readSeconds(name: string, fallback: number): number {
   return value;
 }
 
+/** Reads a count that may be zero. Rejects negatives and fractions. */
+function readCount(name: string, fallback: number): number {
+  const value = readNumber(name, fallback);
+
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Environment variable ${name} must be zero or a positive whole number`);
+  }
+
+  return value;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 export const env = {
@@ -62,6 +73,10 @@ export const env = {
   jwtSecret: readSecret('JWT_SECRET'),
   // used for both the token expiry and the cookie max-age, so they always match
   jwtExpiresInSeconds: readSeconds('JWT_EXPIRES_IN_SECONDS', 604800),
+  // how many proxies sit in front. 0 means none, and req.ip is the socket
+  // address. trusting a hop that is not there lets anyone set X-Forwarded-For
+  // and be counted as a different caller by the rate limiter
+  trustProxy: readCount('TRUST_PROXY', 0),
 };
 
 export const isDevelopment = env.nodeEnv === 'development';
