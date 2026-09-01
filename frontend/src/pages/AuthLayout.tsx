@@ -16,13 +16,13 @@ export function AuthLayout({
   subtitle,
   children,
   footer,
-}: {
+}: Readonly<{
   eyebrow: string;
   title: string;
   subtitle: string;
   children: ReactNode;
   footer: ReactNode;
-}) {
+}>) {
   return (
     <div className="auth-shell">
       <aside className="auth-aside">

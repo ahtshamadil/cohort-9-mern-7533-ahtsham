@@ -34,7 +34,7 @@ function decode(entity: string, code: string): string {
 export function htmlToText(html: string): string {
   return html
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
+    .replace(/<[^<>]*>/g, ' ')
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decode)
     .replace(/\s+/g, ' ')
     .trim();

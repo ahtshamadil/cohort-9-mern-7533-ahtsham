@@ -11,7 +11,7 @@ interface UserResponse {
 }
 
 /** Holds who is signed in and the calls that change it. */
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>('checking');
 

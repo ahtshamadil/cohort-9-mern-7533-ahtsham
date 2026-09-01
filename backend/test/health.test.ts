@@ -30,7 +30,7 @@ describe('security headers', () => {
     const response = await request(app).get('/api/health');
 
     expect(response.headers['x-content-type-options']).to.equal('nosniff');
-    expect(response.headers['x-powered-by']).to.equal(undefined);
+    expect(response.headers['x-powered-by']).to.be.undefined;
   });
 });
 

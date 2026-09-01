@@ -1,0 +1,6 @@
+projectKey=slate-notes
+serverUrl=http://localhost:9000
+serverVersion=26.8.0.126808
+dashboardUrl=http://localhost:9000/dashboard?id=slate-notes
+ceTaskId=c1ca21f0-f98e-4fd2-a70a-6ed14bb8db62
+ceTaskUrl=http://localhost:9000/api/ce/task?id=c1ca21f0-f98e-4fd2-a70a-6ed14bb8db62

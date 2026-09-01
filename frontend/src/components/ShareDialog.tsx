@@ -21,7 +21,7 @@ function who(share: Share): string {
  * the top layer, and a modal that cannot be tested is worse than one built out
  * of what the rest of the app already uses.
  */
-export function ShareDialog({ noteId, onClose }: { noteId: number; onClose: () => void }) {
+export function ShareDialog({ noteId, onClose }: Readonly<{ noteId: number; onClose: () => void }>) {
   const [shares, setShares] = useState<Share[] | null>(null);
   const [email, setEmail] = useState('');
   const [permission, setPermission] = useState<SharePermission>('view');

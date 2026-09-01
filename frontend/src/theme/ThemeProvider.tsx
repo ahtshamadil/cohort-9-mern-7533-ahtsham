@@ -16,7 +16,7 @@ function currentTheme(): Theme {
 }
 
 /** Holds the active theme and writes it to the document and to storage. */
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [theme, setTheme] = useState<Theme>(currentTheme);
 
   // everything here runs in the click handler rather than inside the setState

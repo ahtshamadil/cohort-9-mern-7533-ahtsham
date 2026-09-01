@@ -2,7 +2,7 @@
 export const APP_NAME = 'Slate';
 
 /** The wordmark: a ruled slate with a single marigold mark on it. */
-export function Logo({ size = 'md' }: { size?: 'md' | 'lg' }) {
+export function Logo({ size = 'md' }: Readonly<{ size?: 'md' | 'lg' }>) {
   return (
     <span className={`logo logo-${size}`}>
       <span className="logo-mark" aria-hidden="true">

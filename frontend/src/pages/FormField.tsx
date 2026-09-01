@@ -13,7 +13,7 @@ export function FormField({
   placeholder,
   required = true,
   autoFocus = false,
-}: {
+}: Readonly<{
   id: string;
   label: string;
   type?: string;
@@ -24,7 +24,7 @@ export function FormField({
   placeholder?: string;
   required?: boolean;
   autoFocus?: boolean;
-}) {
+}>) {
   const isPassword = type === 'password';
   const [revealed, setRevealed] = useState(false);
   const [capsLock, setCapsLock] = useState(false);

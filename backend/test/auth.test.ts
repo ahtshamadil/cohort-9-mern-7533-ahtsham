@@ -69,7 +69,7 @@ describe('authentication', function () {
 
       const stored = await prisma.user.findUnique({ where: { email: 'ahtsham@example.com' } });
 
-      expect(stored).to.not.equal(null);
+      expect(stored).to.not.be.null;
     });
 
     it('refuses an address that is already registered', async () => {

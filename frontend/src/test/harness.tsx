@@ -35,7 +35,8 @@ const originalFetch = globalThis.fetch;
  */
 export function stubApi(routes: Record<string, StubbedResponse>): void {
   globalThis.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    const key = `${init?.method ?? 'GET'} ${String(input)}`;
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const key = `${init?.method ?? 'GET'} ${url}`;
     const match = routes[key];
 
     // failing loudly beats a confusing undefined further along - a missing stub
