@@ -168,6 +168,9 @@ export function DashboardPage() {
         <div className="app-header-actions">
           <ThemeToggle />
           <span className="app-user">{displayName}</span>
+          <Link className="button button-ghost" to="/account/password">
+            Password
+          </Link>
           <button type="button" className="button button-ghost" onClick={() => void handleLogout()}>
             Log out
           </button>

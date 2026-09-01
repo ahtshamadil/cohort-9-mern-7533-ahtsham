@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { NoteEditorPage } from './pages/NoteEditorPage';
@@ -20,6 +21,7 @@ export function AppRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/notes/new" element={<NoteEditorPage />} />
         <Route path="/notes/:id" element={<NoteEditorPage />} />
+        <Route path="/account/password" element={<ChangePasswordPage />} />
       </Route>
 
       {/* anything unrecognised goes home, and the guard decides from there */}

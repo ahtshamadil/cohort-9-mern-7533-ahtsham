@@ -21,7 +21,8 @@ export function AuthLayout({
   title: string;
   subtitle: string;
   children: ReactNode;
-  footer: ReactNode;
+  /** The line under the card. Left out on a screen with nowhere else to go. */
+  footer?: ReactNode;
 }) {
   return (
     <div className="auth-shell">
@@ -55,7 +56,7 @@ export function AuthLayout({
 
           {children}
 
-          <p className="auth-footer muted">{footer}</p>
+          {footer !== undefined && <p className="auth-footer muted">{footer}</p>}
         </div>
       </section>
     </div>
