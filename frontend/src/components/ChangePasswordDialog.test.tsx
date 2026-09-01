@@ -1,11 +1,16 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp, restoreFetch, stubApi, testUser } from '../test/harness';
 
+const empty = { status: 200, body: { notes: [], total: 0 } };
+
 const signedIn = {
   'GET /api/auth/me': { status: 200, body: { user: testUser } },
-  'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+  // both shapes of the list request, so this suite does not depend on whether
+  // the paging the dashboard grew has been merged in yet
+  'GET /api/notes': empty,
+  'GET /api/notes?page=1&limit=20': empty,
 };
 
 const ok = { 'PATCH /api/auth/password': { status: 204 } };
@@ -160,7 +165,7 @@ describe('ChangePasswordDialog', () => {
     await open();
     await change('not the one', 'a whole new secret');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Current password is incorrect');
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('Current password is incorrect');
   });
 
   it('passes on the rate limit rather than swallowing it', async () => {
@@ -176,7 +181,7 @@ describe('ChangePasswordDialog', () => {
     await open();
     await change('the old one', 'a whole new secret');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts');
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('Too many attempts');
   });
 
   it('says so when the server cannot be reached at all', async () => {
@@ -186,7 +191,7 @@ describe('ChangePasswordDialog', () => {
     await open();
     await change('the old one', 'a whole new secret');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server');
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('Could not reach the server');
   });
 
   it('stops a password longer than the API stores', async () => {
