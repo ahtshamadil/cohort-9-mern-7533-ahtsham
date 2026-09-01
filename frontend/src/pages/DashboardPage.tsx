@@ -13,6 +13,7 @@ import {
   type NoteSort,
 } from '../api/notes';
 import { useAuth } from '../auth/useAuth';
+import { AccountMenu } from '../components/AccountMenu';
 import { ExportMenu, type ExportFormat } from '../components/ExportMenu';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -192,10 +193,7 @@ export function DashboardPage() {
 
         <div className="app-header-actions">
           <ThemeToggle />
-          <span className="app-user">{displayName}</span>
-          <Link className="button button-ghost" to="/account/password">
-            Password
-          </Link>
+          <AccountMenu name={displayName} />
           <button type="button" className="button button-ghost" onClick={() => void handleLogout()}>
             Log out
           </button>
