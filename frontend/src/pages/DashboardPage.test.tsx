@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp, restoreFetch, stubApi, testUser } from '../test/harness';
+import { server } from '../test/realtime';
 
 const signedIn = { 'GET /api/auth/me': { status: 200, body: { user: testUser } } };
 
@@ -12,6 +13,7 @@ const note = {
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-02T00:00:00.000Z',
   owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  pinned: false,
   permission: 'owner' as const,
 };
 
@@ -22,6 +24,7 @@ const other = {
   createdAt: '2026-08-03T00:00:00.000Z',
   updatedAt: '2026-08-04T00:00:00.000Z',
   owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  pinned: false,
   permission: 'owner' as const,
 };
 
@@ -30,11 +33,12 @@ const both = { status: 200, body: { notes: [note, other], total: 2 } };
 describe('DashboardPage', () => {
   afterEach(() => {
     restoreFetch();
+    server.reset();
     jest.restoreAllMocks();
   });
 
   it('lists the notes it gets back', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } } });
 
     renderApp('/');
 
@@ -42,7 +46,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows the body as text rather than as markup', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } } });
 
     renderApp('/');
 
@@ -52,7 +56,7 @@ describe('DashboardPage', () => {
   });
 
   it('offers a clean slate when there are none', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } } });
 
     renderApp('/');
 
@@ -60,7 +64,7 @@ describe('DashboardPage', () => {
   });
 
   it('says so when the notes cannot be loaded', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 0, networkError: true } });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 0, networkError: true } });
 
     renderApp('/');
 
@@ -70,7 +74,7 @@ describe('DashboardPage', () => {
   it('opens a note when its card is clicked', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
       'GET /api/notes/1': { status: 200, body: { note } },
     });
 
@@ -84,7 +88,7 @@ describe('DashboardPage', () => {
   });
 
   it('links to a blank editor for a new note', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } } });
 
     renderApp('/');
 
@@ -97,7 +101,7 @@ describe('DashboardPage', () => {
   it('says so and stays put when logging out fails', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
       // the server is unreachable, so the cookie is still sitting there and the
       // session is still live. navigating away would tell somebody on a shared
       // machine they had signed out when they had not
@@ -117,7 +121,7 @@ describe('DashboardPage', () => {
   it('returns to the log-in screen after logging out', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
       'POST /api/auth/logout': { status: 204 },
     });
 
@@ -132,8 +136,8 @@ describe('DashboardPage', () => {
   it('searches for what was typed', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
-      'GET /api/notes?q=milk': { status: 200, body: { notes: [note], total: 1 } },
+      'GET /api/notes?page=1&limit=20': both,
+      'GET /api/notes?q=milk&page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
     });
 
     renderApp('/');
@@ -154,8 +158,8 @@ describe('DashboardPage', () => {
   it('says so when a search matches nothing', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
-      'GET /api/notes?q=zzz': { status: 200, body: { notes: [], total: 0 } },
+      'GET /api/notes?page=1&limit=20': both,
+      'GET /api/notes?q=zzz&page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
     });
 
     renderApp('/');
@@ -173,8 +177,8 @@ describe('DashboardPage', () => {
   it('asks for a different order when one is chosen', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
-      'GET /api/notes?sort=title': { status: 200, body: { notes: [other], total: 1 } },
+      'GET /api/notes?page=1&limit=20': both,
+      'GET /api/notes?sort=title&page=1&limit=20': { status: 200, body: { notes: [other], total: 1 } },
     });
 
     renderApp('/');
@@ -191,7 +195,7 @@ describe('DashboardPage', () => {
   it('downloads an export under the name the server gave it', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
+      'GET /api/notes?page=1&limit=20': both,
       'GET /api/notes/export': {
         status: 200,
         body: { version: 1, notes: [] },
@@ -222,7 +226,7 @@ describe('DashboardPage', () => {
   it('reads the filename however the header is cased', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
+      'GET /api/notes?page=1&limit=20': both,
       'GET /api/notes/export': {
         status: 200,
         body: { version: 1, notes: [] },
@@ -251,7 +255,13 @@ describe('DashboardPage', () => {
   });
 
   it('downloads a text copy built from every note', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': both });
+    stubApi({
+      ...signedIn,
+      'GET /api/notes?page=1&limit=20': both,
+      // the text export asks for the list unpaged on purpose - it is every note,
+      // not whatever page the dashboard happens to be showing
+      'GET /api/notes': both,
+    });
 
     const files: Blob[] = [];
     URL.createObjectURL = jest.fn((blob: Blob) => {
@@ -281,7 +291,7 @@ describe('DashboardPage', () => {
   it('says how many notes an import brought in', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
+      'GET /api/notes?page=1&limit=20': both,
       'POST /api/notes/import': { status: 201, body: { imported: 2 } },
     });
 
@@ -299,7 +309,7 @@ describe('DashboardPage', () => {
   });
 
   it('turns away a file that is not a json export', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': both });
+    stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': both });
 
     renderApp('/');
     // userEvent honours the accept attribute and would drop this file without a
@@ -318,7 +328,7 @@ describe('DashboardPage', () => {
   it('reports what the API objected to in an import file', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': both,
+      'GET /api/notes?page=1&limit=20': both,
       'POST /api/notes/import': {
         status: 400,
         body: { error: { message: 'Unsupported export version' } },
@@ -336,6 +346,108 @@ describe('DashboardPage', () => {
     expect(within(alerts[0]).getByText(/Unsupported export version/)).toBeInTheDocument();
   });
 
+  describe('paging', () => {
+    // the API answers with the whole count rather than the page's, which is what
+    // lets the dashboard say how far through the list it is
+    const firstPage = { status: 200, body: { notes: [note], total: 45 } };
+    const secondPage = { status: 200, body: { notes: [other], total: 45 } };
+
+    it('draws no pager when every note fits on one page', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': both });
+
+      renderApp('/');
+
+      await screen.findByRole('heading', { name: 'Shopping' });
+      expect(
+        screen.queryByRole('navigation', { name: 'Pages of notes' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('asks for the next page when Next is clicked', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': firstPage,
+        'GET /api/notes?page=2&limit=20': secondPage,
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      expect(await screen.findByText('Page 1 of 3 - 45 notes')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+
+      expect(await screen.findByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
+      expect(screen.getByText('Page 2 of 3 - 45 notes')).toBeInTheDocument();
+    });
+
+    it('offers no page before the first or after the last', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': firstPage,
+        'GET /api/notes?page=2&limit=20': secondPage,
+        'GET /api/notes?page=3&limit=20': { status: 200, body: { notes: [note], total: 45 } },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await screen.findByText('Page 1 of 3 - 45 notes');
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(await screen.findByRole('button', { name: 'Next' }));
+
+      await screen.findByText('Page 3 of 3 - 45 notes');
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled();
+    });
+
+    it('goes back to the first page when the search changes', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': firstPage,
+        'GET /api/notes?page=2&limit=20': secondPage,
+        // page 2 of the old list means nothing in the new one, and asking for it
+        // would answer with no stub here rather than quietly with the wrong notes
+        'GET /api/notes?q=milk&page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await screen.findByText('Page 1 of 3 - 45 notes');
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await screen.findByText('Page 2 of 3 - 45 notes');
+
+      await user.type(screen.getByRole('searchbox', { name: 'Search notes' }), 'milk');
+
+      expect(await screen.findByRole('heading', { name: 'Shopping' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('navigation', { name: 'Pages of notes' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('steps back rather than showing an empty page past the end', async () => {
+      // a note deleted off the last page shrinks the total under whatever page
+      // number is being shown, which would otherwise look like an empty account
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': firstPage,
+        'GET /api/notes?page=2&limit=20': { status: 200, body: { notes: [], total: 12 } },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await screen.findByText('Page 1 of 3 - 45 notes');
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+
+      expect(await screen.findByRole('heading', { name: 'Shopping' })).toBeInTheDocument();
+    });
+  });
+
   describe('the shared list', () => {
     const theirs = {
       id: 9,
@@ -349,8 +461,82 @@ describe('DashboardPage', () => {
 
     const shared = { status: 200, body: { notes: [theirs], total: 1 } };
 
+    it('names what it is loading on whichever list is open', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': both,
+        'GET /api/notes/shared?page=1&limit=20': { ...shared, delayMs: 300 },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await screen.findByRole('heading', { name: 'Shopping' });
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      // the two lists were written at different times and said the same thing
+      // while waiting, which was only ever right for one of them
+      expect(screen.getByText('Loading the notes shared with you...')).toBeInTheDocument();
+    });
+
+    it('picks up a note the moment it is shared', async () => {
+      let sharedNotes: unknown = { notes: [], total: 0 };
+
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': {
+          status: 200,
+          // read when the request is answered rather than when it is stubbed, so
+          // the second ask sees what the share left behind
+          get body() {
+            return sharedNotes;
+          },
+        },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Nothing shared yet' });
+
+      sharedNotes = { notes: [theirs], total: 1 };
+      server.shareChanged(theirs.id);
+
+      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+    });
+
+    it('drops a note the moment the share is taken back', async () => {
+      let sharedNotes: unknown = { notes: [theirs], total: 1 };
+
+      stubApi({
+        ...signedIn,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': {
+          status: 200,
+          get body() {
+            return sharedNotes;
+          },
+        },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Rota' });
+
+      sharedNotes = { notes: [], total: 0 };
+      server.shareChanged(theirs.id);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Nothing shared yet' }),
+      ).toBeInTheDocument();
+    });
+
     it('starts on your own notes rather than the shared ones', async () => {
-      stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
+      stubApi({ ...signedIn, 'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } } });
 
       renderApp('/');
 
@@ -364,8 +550,8 @@ describe('DashboardPage', () => {
     it('asks the shared route once that tab is chosen', async () => {
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
-        'GET /api/notes/shared': shared,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
+        'GET /api/notes/shared?page=1&limit=20': shared,
       });
 
       renderApp('/');
@@ -382,8 +568,8 @@ describe('DashboardPage', () => {
     it('says whose note it is and that it cannot be changed', async () => {
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
-        'GET /api/notes/shared': shared,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': shared,
       });
 
       renderApp('/');
@@ -400,8 +586,8 @@ describe('DashboardPage', () => {
     it('does not offer export or import over notes you do not own', async () => {
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
-        'GET /api/notes/shared': shared,
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': shared,
       });
 
       renderApp('/');
@@ -418,8 +604,8 @@ describe('DashboardPage', () => {
     it('says nothing is shared rather than showing the empty slate', async () => {
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
-        'GET /api/notes/shared': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
       });
 
       renderApp('/');
@@ -434,8 +620,8 @@ describe('DashboardPage', () => {
     it('does not blame the shared list for a failure on your own', async () => {
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 0, networkError: true },
-        'GET /api/notes/shared': { ...shared, delayMs: 300 },
+        'GET /api/notes?page=1&limit=20': { status: 0, networkError: true },
+        'GET /api/notes/shared?page=1&limit=20': { ...shared, delayMs: 300 },
       });
 
       renderApp('/');
@@ -454,9 +640,9 @@ describe('DashboardPage', () => {
 
       stubApi({
         ...signedIn,
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
-        'GET /api/notes/shared': shared,
-        'GET /api/notes/shared?q=rota': { status: 200, body: { notes: [match], total: 1 } },
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared?page=1&limit=20': shared,
+        'GET /api/notes/shared?q=rota&page=1&limit=20': { status: 200, body: { notes: [match], total: 1 } },
       });
 
       renderApp('/');

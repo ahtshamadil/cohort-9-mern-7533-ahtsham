@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { apiFetch } from '../api/client';
+import { closeSocket } from '../realtime/socket';
 import { AuthContext } from './AuthContext';
 import type { AuthContextValue, AuthStatus, RegisterInput, User } from './AuthContext';
 
@@ -91,6 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await apiFetch<void>('/api/auth/logout', { method: 'POST' });
 
+    // the socket authenticated with the session cookie the server has just
+    // cleared, so leaving it open would leave a connection nothing stands behind
+    closeSocket();
     settle(null);
   }, [settle]);
 

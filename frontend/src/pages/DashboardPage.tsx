@@ -9,6 +9,7 @@ import {
   listNotes,
   listSharedNotes,
   plainText,
+  setPinned,
   type Note,
   type NoteSort,
 } from '../api/notes';
@@ -16,12 +17,16 @@ import { useAuth } from '../auth/useAuth';
 import { ExportMenu, type ExportFormat } from '../components/ExportMenu';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { useUserEvents } from '../realtime/socket';
 
 /** Which of the two lists the dashboard is showing. */
 type Tab = 'mine' | 'shared';
 
 /** How long to wait after the last keystroke before searching. */
 const searchDelayMs = 300;
+
+/** How many notes one page holds. Sent rather than left to the API's own default. */
+const pageSize = 20;
 
 const sortOptions: { value: NoteSort; label: string }[] = [
   { value: 'recent', label: 'Recently changed' },
@@ -37,6 +42,11 @@ function changed(at: string): string {
     month: 'short',
     year: 'numeric',
   });
+}
+
+/** Pinned first, then whatever order the API sent them in. */
+function pinnedFirst(notes: Note[]): Note[] {
+  return [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 /** Whoever owns a shared note, by name where they gave one. */
@@ -59,18 +69,27 @@ export function DashboardPage() {
   const [term, setTerm] = useState('');
   const [sort, setSort] = useState<NoteSort>('recent');
   const [tab, setTab] = useState<Tab>('mine');
+  const [page, setPage] = useState(1);
   const [reloads, setReloads] = useState(0);
 
   const [notes, setNotes] = useState<Note[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  // the note that has just been pinned, so only that card plays the animation
+  const [justPinned, setJustPinned] = useState<number | null>(null);
 
   // searching on every keystroke would be a request per letter. each one restarts
   // the timer, so only the last of a burst is ever asked for
   useEffect(() => {
-    const timer = setTimeout(() => setTerm(search), searchDelayMs);
+    const timer = setTimeout(() => {
+      setTerm(search);
+      // a search narrows the list, so whatever page number was reached in the
+      // old one means nothing in the new one
+      setPage(1);
+    }, searchDelayMs);
 
     return () => clearTimeout(timer);
   }, [search]);
@@ -80,11 +99,12 @@ export function DashboardPage() {
 
     const load = tab === 'mine' ? listNotes : listSharedNotes;
 
-    load({ q: term, sort })
-      .then(({ notes: found }) => {
+    load({ q: term, sort, page, limit: pageSize })
+      .then(({ notes: found, total: matched }) => {
         if (cancelled) return;
 
-        setNotes(found);
+        setNotes(pinnedFirst(found));
+        setTotal(matched);
         setError(null);
       })
       .catch((cause: Error) => {
@@ -95,7 +115,24 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [term, sort, tab, reloads]);
+  }, [term, sort, tab, page, reloads]);
+
+  // both of these only ever reach the account they are about, so the only list
+  // they can change is the shared one. the note itself is not in the message -
+  // it is asked for again, and comes back shaped for whoever is reading it
+  useUserEvents({
+    onShareChanged: () => {
+      if (tab === 'shared') setReloads((count) => count + 1);
+    },
+  });
+
+  // deleting the last note on the last page leaves the list sitting past the end
+  // of itself, which looks like an empty account rather than an empty page
+  useEffect(() => {
+    const last = Math.max(1, Math.ceil(total / pageSize));
+
+    if (page > last) setPage(last);
+  }, [total, page]);
 
   /** Ends the session and leaves, or reports why it could not. */
   async function handleLogout() {
@@ -109,6 +146,36 @@ export function DashboardPage() {
       // session is still live. saying so beats navigating away and leaving
       // someone believing they signed out on a shared machine when they did not
       setLogoutError('Could not log out. Check your connection and try again.');
+    }
+  }
+
+  /**
+   * Pins or unpins a note.
+   *
+   * The card moves before the API answers, because waiting a round trip to see
+   * a pin land makes the animation look like a fault. A refusal puts it back.
+   */
+  async function togglePin(note: Note) {
+    const pinned = !note.pinned;
+    // the list as it stands, to put back if the save is refused. rebuilding it
+    // from the changed one would restore the pin but not the order it was in
+    const before = notes;
+
+    setNotes((current) =>
+      current === null
+        ? current
+        : pinnedFirst(current.map((held) => (held.id === note.id ? { ...held, pinned } : held))),
+    );
+
+    if (pinned) {
+      setJustPinned(note.id);
+    }
+
+    try {
+      await setPinned(note.id, pinned);
+    } catch {
+      setNotes(before);
+      setNotice({ text: 'Could not change that pin. Try again.', failed: true });
     }
   }
 
@@ -176,11 +243,13 @@ export function DashboardPage() {
     }
 
     setTab(next);
+    setPage(1);
     setNotes(null);
     setNotice(null);
     setError(null);
   }
 
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   const displayName = user?.name ?? user?.email ?? '';
   const searching = term !== '';
   const mine = tab === 'mine';
@@ -256,7 +325,10 @@ export function DashboardPage() {
               id="notes-sort"
               className="notes-sort"
               value={sort}
-              onChange={(event) => setSort(event.target.value as NoteSort)}
+              onChange={(event) => {
+                setSort(event.target.value as NoteSort);
+                setPage(1);
+              }}
             >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -312,9 +384,7 @@ export function DashboardPage() {
 
         {/* the list changes without anything being clicked, so the count is
             announced rather than left to be noticed */}
-        <p className="visually-hidden" role="status">
-          {notes === null ? '' : counted(notes.length)}
-        </p>
+        <output className="visually-hidden">{notes === null ? '' : counted(total)}</output>
 
         {notes !== null && notes.length === 0 && !searching && (
           <div className="empty-state">
@@ -337,7 +407,13 @@ export function DashboardPage() {
         {notes !== null && notes.length > 0 && (
           <ul className="note-list">
             {notes.map((note) => (
-              <li key={note.id}>
+              <li
+                key={note.id}
+                className={
+                  note.pinned && note.id === justPinned ? 'note-item pinning' : 'note-item'
+                }
+                onAnimationEnd={() => setJustPinned(null)}
+              >
                 <Link className="note-card" to={`/notes/${note.id}`}>
                   <h2 className="note-card-title">{note.title}</h2>
                   <p className="note-card-excerpt">{plainText(note.content)}</p>
@@ -347,12 +423,65 @@ export function DashboardPage() {
                     {note.permission === 'view' && ' - view only'}
                   </p>
                 </Link>
+
+                {/* only the owner may pin, and the button sits outside the link
+                    rather than inside it - a button within an anchor is not
+                    valid, and clicking it would follow the link as well */}
+                {mine && (
+                  <button
+                    type="button"
+                    className={note.pinned ? 'pin-button pinned' : 'pin-button'}
+                    aria-pressed={note.pinned}
+                    aria-label={note.pinned ? `Unpin ${note.title}` : `Pin ${note.title}`}
+                    onClick={() => void togglePin(note)}
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                      <path
+                        d="M9 4h6l-1 5 3 3v2h-4v5l-1 1-1-1v-5H7v-2l3-3z"
+                        fill={note.pinned ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
 
-        {notes === null && error === null && <p className="muted">Loading your notes...</p>}
+        {notes !== null && pages > 1 && (
+          <nav className="pager" aria-label="Pages of notes">
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page === 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              Previous
+            </button>
+
+            <span className="muted">
+              Page {page} of {pages} - {counted(total)}
+            </span>
+
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={page >= pages}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </nav>
+        )}
+
+        {notes === null && error === null && (
+          <div className="empty-state">
+            <p>{mine ? 'Loading your notes...' : 'Loading the notes shared with you...'}</p>
+          </div>
+        )}
       </main>
     </div>
   );

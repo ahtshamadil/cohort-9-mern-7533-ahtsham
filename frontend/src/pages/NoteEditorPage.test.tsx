@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp, restoreFetch, stubApi, testUser } from '../test/harness';
+import { server } from '../test/realtime';
 
 const signedIn = { 'GET /api/auth/me': { status: 200, body: { user: testUser } } };
 
@@ -12,6 +13,7 @@ const note = {
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-02T00:00:00.000Z',
   owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  pinned: false,
   permission: 'owner' as const,
 };
 
@@ -33,7 +35,10 @@ function bodyOf(key: string): unknown {
 }
 
 describe('NoteEditorPage', () => {
-  afterEach(restoreFetch);
+  afterEach(() => {
+    restoreFetch();
+    server.reset();
+  });
 
   it('loads the note it was asked for', async () => {
     stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
@@ -106,7 +111,9 @@ describe('NoteEditorPage', () => {
     expect(await screen.findByRole('alert', undefined, { timeout: 4000 })).toHaveTextContent(
       'Could not save',
     );
-    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    // a failed save reads exactly like a saved one unless it is marked, which is
+    // the one line of the status row that must never be misread
+    expect(screen.getByText('Not saved')).toHaveClass('failed');
     expect(screen.getByLabelText('Title')).toHaveValue('Shopping!');
   });
 
@@ -174,7 +181,7 @@ describe('NoteEditorPage', () => {
       ...signedIn,
       'GET /api/notes/1': { status: 200, body: { note } },
       'DELETE /api/notes/1': { status: 204 },
-      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
     });
 
     renderApp('/notes/1');
@@ -228,7 +235,7 @@ describe('NoteEditorPage', () => {
       ...signedIn,
       'GET /api/notes/1': { status: 200, body: { note } },
       'PATCH /api/notes/1': { status: 200, body: { note } },
-      'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
+      'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [note], total: 1 } },
     });
 
     renderApp('/notes/1');
@@ -285,7 +292,7 @@ describe('NoteEditorPage', () => {
       stubApi({
         ...signedIn,
         'GET /api/notes/1': { status: 200, body: { note: viewOnly } },
-        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
       });
 
       renderApp('/notes/1');
@@ -364,6 +371,153 @@ describe('NoteEditorPage', () => {
 
       expect(await screen.findByRole('dialog', { name: 'Share this note' })).toBeInTheDocument();
       expect(await screen.findByText('someone@example.com')).toBeInTheDocument();
+    });
+  });
+  describe('what other people do to the note', () => {
+    const later = { id: 1, title: 'Groceries', content: '<p>Milk, bread and jam</p>' };
+
+    it('joins the room for the note it is showing', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      await screen.findByDisplayValue('Shopping');
+
+      expect(server.joined()).toBe(1);
+    });
+
+    it('applies a change made while nothing is being typed', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      await screen.findByDisplayValue('Shopping');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+
+      expect(await screen.findByDisplayValue('Groceries')).toBeInTheDocument();
+      expect(screen.getByText('Milk, bread and jam')).toBeInTheDocument();
+    });
+
+    it('keeps what is being typed and says the note changed underneath', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      const title = await screen.findByLabelText('Title');
+      await user.clear(title);
+      await user.type(title, 'Mine');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+
+      // last write wins, and the person typing is told rather than finding out
+      // when their words disappear under somebody else's
+      expect(await screen.findByText(/Somebody else changed this note/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Title')).toHaveValue('Mine');
+    });
+
+    it('leaves the notice up once the autosave has been and gone', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes/1': { status: 200, body: { note } },
+        'PATCH /api/notes/1': { status: 200, body: { note: { ...note, title: 'Mine' } } },
+      });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      const title = await screen.findByLabelText('Title');
+      await user.clear(title);
+      await user.type(title, 'Mine');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+      await screen.findByText(/Somebody else changed this note/);
+
+      // the save that follows is what used to clear this, which left the notice
+      // on screen for about a tenth of a second - long enough to pass a test and
+      // far too short for anybody to read
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      await screen.findByText('Saved');
+
+      expect(screen.getByText(/Somebody else changed this note/)).toBeInTheDocument();
+    });
+
+    it('takes the notice away when it is dismissed', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      const title = await screen.findByLabelText('Title');
+      await user.clear(title);
+      await user.type(title, 'Mine');
+
+      server.updated({ ...later, updatedAt: '2026-08-03T00:00:00.000Z' });
+      await screen.findByText(/Somebody else changed this note/);
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+      expect(screen.queryByText(/Somebody else changed this note/)).not.toBeInTheDocument();
+    });
+
+    it('ignores a change older than what is already shown', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      await screen.findByDisplayValue('Shopping');
+
+      // the note was loaded at 08-02, so this one is news from before that and
+      // applying it would undo a change that has already been seen
+      server.updated({ ...later, updatedAt: '2026-08-01T00:00:00.000Z' });
+
+      expect(screen.getByLabelText('Title')).toHaveValue('Shopping');
+    });
+
+    it('says so when the note is deleted underneath it', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note } } });
+
+      renderApp('/notes/1');
+      await screen.findByDisplayValue('Shopping');
+
+      server.deleted();
+
+      expect(
+        await screen.findByRole('heading', { name: 'This note has been deleted' }),
+      ).toBeInTheDocument();
+    });
+
+    it('says so when the share behind it is taken back', async () => {
+      const theirs = { ...note, permission: 'edit' as const };
+      stubApi({ ...signedIn, 'GET /api/notes/1': { status: 200, body: { note: theirs } } });
+
+      renderApp('/notes/1');
+      await screen.findByDisplayValue('Shopping');
+
+      server.revoked();
+
+      expect(
+        await screen.findByRole('heading', { name: 'This note is not shared with you any more' }),
+      ).toBeInTheDocument();
+    });
+
+    it('does not show the gone screen to whoever did the deleting', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes/1': { status: 200, body: { note } },
+        'DELETE /api/notes/1': { status: 204 },
+        'GET /api/notes?page=1&limit=20': { status: 200, body: { notes: [], total: 0 } },
+      });
+
+      renderApp('/notes/1');
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('button', { name: 'Delete' }));
+      await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
+
+      // the owner is in the room too, so the broadcast reaches them. they asked
+      // for this and are on their way to the list, not to a notice about it
+      server.deleted();
+
+      expect(await screen.findByRole('heading', { name: 'A clean slate' })).toBeInTheDocument();
     });
   });
 });
