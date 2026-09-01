@@ -28,7 +28,6 @@
       "message": "Use <dialog> instead of the \"dialog\" role to ensure accessibility across all devices.",
       "effort": "5min",
       "debt": "5min",
-      "author": "ahtshamadil302@gmail.com",
       "tags": [
         "accessibility",
         "react"
@@ -73,7 +72,6 @@
       "message": "Use <dialog> instead of the \"dialog\" role to ensure accessibility across all devices.",
       "effort": "5min",
       "debt": "5min",
-      "author": "ahtshamadil302@gmail.com",
       "tags": [
         "accessibility",
         "react"
@@ -118,7 +116,6 @@
       "message": "Prefer `Blob#text()` over `FileReader#readAsText(blob)`.",
       "effort": "5min",
       "debt": "5min",
-      "author": "ahtshamadil302@gmail.com",
       "tags": [
         "modernization",
         "editable-source",
@@ -165,7 +162,6 @@
       "message": "Prefer top-level await over using a promise chain.",
       "effort": "5min",
       "debt": "5min",
-      "author": "ahtshamadil302@gmail.com",
       "tags": [
         "async",
         "editable-source",

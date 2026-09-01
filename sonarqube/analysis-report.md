@@ -8,12 +8,12 @@ together. Run against SonarQube Community 26.8 on 1 September 2026.
 | Metric | Value |
 | --- | --- |
 | Quality gate | **Passed** |
-| Lines of code | 5,146 |
+| Lines of code | 5,041 |
 | Bugs | 0 |
 | Vulnerabilities | 0 |
 | Security hotspots | 0 |
 | Code smells | 4 |
-| Coverage | 90.9% |
+| Coverage | 91.8% |
 | Duplicated lines | 0.4% |
 | Reliability / Security / Maintainability | A / A / A |
 | Technical debt | 20 min |
@@ -21,6 +21,13 @@ together. Run against SonarQube Community 26.8 on 1 September 2026.
 Coverage is real, not estimated: c8 wraps Mocha and Jest runs with `--coverage`,
 and Sonar reads the two `lcov.info` files. 210 backend and 174 frontend tests
 pass at the analysed commit.
+
+The frontend's tests live under `frontend/src`, so that path is named in both
+`sonar.sources` and `sonar.tests`, with `sonar.test.inclusions` deciding which
+of its files are tests. Without that the test helpers were analysed as
+production code and counted as uncovered. The two entrypoints neither runner
+instruments - `backend/src/index.ts` and `frontend/src/main.tsx` - are named in
+`sonar.coverage.exclusions` for the same reason.
 
 ## What the first run found
 

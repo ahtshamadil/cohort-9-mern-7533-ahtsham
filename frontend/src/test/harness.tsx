@@ -33,6 +33,15 @@ function requestUrl(input: RequestInfo | URL): string {
   return input instanceof URL ? input.href : input.url;
 }
 
+/** The method fetch will actually use: init wins, then the Request's own. */
+function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+  if (init?.method !== undefined) {
+    return init.method;
+  }
+
+  return typeof input === 'string' || input instanceof URL ? 'GET' : input.method;
+}
+
 const originalFetch = globalThis.fetch;
 
 /**
@@ -44,7 +53,7 @@ const originalFetch = globalThis.fetch;
  */
 export function stubApi(routes: Record<string, StubbedResponse>): void {
   globalThis.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    const key = `${init?.method ?? 'GET'} ${requestUrl(input)}`;
+    const key = `${requestMethod(input, init)} ${requestUrl(input)}`;
     const match = routes[key];
 
     // failing loudly beats a confusing undefined further along - a missing stub
