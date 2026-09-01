@@ -81,11 +81,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 }
 
 /**
- * The longest password the API stores, in characters.
+ * A character cap for the password fields, set at the API's byte limit.
  *
- * The API counts bytes, because that is what bcrypt reads. A character can be
- * up to four of them, so this only stops the obvious case - anything past it is
- * still refused by the API and shown as a field error.
+ * The two are not the same thing. The API counts bytes, because that is what
+ * bcrypt reads, and one character can be four of them - 72 accented characters
+ * pass this and are still 144 bytes. It stops the obvious case only; anything
+ * past the byte limit is refused by the API and shown as a field error.
  */
 export const maxPasswordLength = 72;
 
