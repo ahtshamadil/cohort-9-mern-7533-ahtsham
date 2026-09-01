@@ -12,4 +12,13 @@ module.exports = {
   // same value, a query that finds nothing trips this first and the failure
   // reads "exceeded timeout" instead of naming the element it looked for
   testTimeout: 15000,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text-summary', 'lcov'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/test/**',
+    '!src/main.tsx',
+    '!src/vite-env.d.ts',
+  ],
 };
