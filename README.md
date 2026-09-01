@@ -216,9 +216,9 @@ caller send `X-Forwarded-For` and look like a new client on every request.
 ### Passwords
 
 Eight characters or more, and at most 72 bytes. The cap is not arbitrary - bcrypt reads
-72 bytes and ignores the rest, so without it two different passwords sharing a 72 byte
+72 bytes and ignores the rest, so without it two different passwords sharing a 72-byte
 prefix both open the same account. Bytes, not characters, because that is what bcrypt
-counts and a four byte character reaches the cap in 18 of them.
+counts and a four-byte character reaches the cap in 18 of them.
 
 The few hundred passwords every credential stuffing list opens with are refused. That is
 not a strength meter, it just removes the guesses worth trying first.

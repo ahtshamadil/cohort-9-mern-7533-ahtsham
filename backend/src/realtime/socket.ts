@@ -238,6 +238,21 @@ export function shareRevoked(userId: number, noteId: number): void {
   io.in(userRoom(userId)).socketsLeave(noteRoom(noteId));
 }
 
+/**
+ * Drops the sockets an account already has open.
+ *
+ * The handshake checks the token version, but only once. A socket that was
+ * authenticated before a password change would otherwise keep working on the
+ * withdrawn session until its token expired.
+ */
+export function sessionsWithdrawn(userId: number): void {
+  if (io === null) {
+    return;
+  }
+
+  io.in(userRoom(userId)).disconnectSockets(true);
+}
+
 /** Starts the socket server on the same http server the API is served from. */
 export function attachRealtime(server: HttpServer): NoteServer {
   const created: NoteServer = new Server(server, { path: realtimePath });

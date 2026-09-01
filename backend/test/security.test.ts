@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import express from 'express';
+import express, { type Express } from 'express';
 import request from 'supertest';
 
 import { createApp } from '../src/app.js';
@@ -14,14 +14,14 @@ const app = createApp();
 
 const password = 'correct horse battery';
 
-async function signIn(email: string) {
+async function signIn(email: string): Promise<ReturnType<typeof request.agent>> {
   const agent = request.agent(app);
   await agent.post('/api/auth/register').send({ email, password });
 
   return agent;
 }
 
-async function clearTables() {
+async function clearTables(): Promise<void> {
   await prisma.noteShare.deleteMany();
   await prisma.note.deleteMany();
   await prisma.user.deleteMany();
@@ -33,7 +33,7 @@ after(async () => {
 
 describe('rate limiting', () => {
   /** An app with one limited route, so a real limit can be reached in a test. */
-  function limited(max: number) {
+  function limited(max: number): Express {
     const small = express();
 
     small.use('/thing', createLimiter(max, 'Too many attempts.', 'test'), (_req, res) => {
@@ -104,6 +104,22 @@ describe('password rules', () => {
         .send({ email: 'edge@example.com', password: 'a'.repeat(maxPasswordBytes) });
 
       expect(response.status).to.equal(201);
+    });
+
+    it('still logs in an account whose password is past the cap', async () => {
+      // registering at the limit and logging in past it is the same case as an
+      // account made before the cap existed: bcrypt only ever read 72 bytes
+      const at = 'a'.repeat(maxPasswordBytes);
+
+      await request(app)
+        .post('/api/auth/register')
+        .send({ email: 'legacy@example.com', password: at });
+
+      const login = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'legacy@example.com', password: `${at}and then some more` });
+
+      expect(login.status).to.equal(200);
     });
 
     it('counts bytes rather than characters', async () => {
@@ -200,10 +216,11 @@ describe('changing a password', function () {
   it('leaves the session that changed it signed in', async () => {
     const agent = await signIn('stays@example.com');
 
-    await agent
+    const changed = await agent
       .patch('/api/auth/password')
       .send({ currentPassword: password, newPassword: 'a whole new secret' });
 
+    expect(changed.status).to.equal(204);
     expect((await agent.get('/api/auth/me')).status).to.equal(200);
   });
 

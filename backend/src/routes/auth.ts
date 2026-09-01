@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { authLimiter } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { sessionsWithdrawn } from '../realtime/socket.js';
 import { validateBody } from '../middleware/validate.js';
 import {
   authenticateUser,
@@ -34,14 +35,12 @@ const registerSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
 });
 
-// no rules on the password here beyond the length bcrypt reads - an old password
-// should still be able to log in, whatever it would fail today
+// no rules on the password here - an old password should still be able to log
+// in, whatever it would fail today. capping the length would lock out an
+// account made before the cap, since bcrypt only ever compares 72 bytes
 const loginSchema = z.object({
   email: z.email('Enter a valid email address'),
-  password: z
-    .string()
-    .min(1, 'Password is required')
-    .refine((value) => Buffer.byteLength(value) <= maxPasswordBytes, 'Invalid email or password'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 const changePasswordSchema = z.object({
@@ -104,6 +103,10 @@ authRouter.patch(
       req.body.currentPassword,
       req.body.newPassword,
     );
+
+    // the handshake only checks the version once, so the sockets the old
+    // sessions opened have to be dropped rather than left running
+    sessionsWithdrawn(req.userId);
 
     // every other session is now holding an older version, so this one needs a
     // fresh cookie or the change would sign the person doing it out too

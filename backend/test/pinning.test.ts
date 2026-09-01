@@ -8,17 +8,27 @@ const app = createApp();
 
 const password = 'correct horse battery';
 
-async function signIn(email: string) {
+interface ApiNote {
+  id: number;
+  title: string;
+  pinned: boolean;
+  updatedAt: string;
+}
+
+async function signIn(email: string): Promise<ReturnType<typeof request.agent>> {
   const agent = request.agent(app);
   await agent.post('/api/auth/register').send({ email, password });
 
   return agent;
 }
 
-async function createNote(agent: ReturnType<typeof request.agent>, title: string) {
+async function createNote(
+  agent: ReturnType<typeof request.agent>,
+  title: string,
+): Promise<ApiNote> {
   const response = await agent.post('/api/notes').send({ title, content: '' });
 
-  return response.body.note;
+  return response.body.note as ApiNote;
 }
 
 /** The id of the account that registered with this address. */
