@@ -7,6 +7,7 @@ import {
   exportNotesAsText,
   importNotes,
   listNotes,
+  listSharedNotes,
   plainText,
   type Note,
   type NoteSort,
@@ -15,6 +16,9 @@ import { useAuth } from '../auth/useAuth';
 import { ExportMenu, type ExportFormat } from '../components/ExportMenu';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
+
+/** Which of the two lists the dashboard is showing. */
+type Tab = 'mine' | 'shared';
 
 /** How long to wait after the last keystroke before searching. */
 const searchDelayMs = 300;
@@ -35,6 +39,11 @@ function changed(at: string): string {
   });
 }
 
+/** Whoever owns a shared note, by name where they gave one. */
+function ownerName(note: Note): string {
+  return note.owner.name ?? note.owner.email;
+}
+
 /** How many notes, worded so a screen reader is not read "1 notes". */
 function counted(total: number): string {
   return `${total} ${total === 1 ? 'note' : 'notes'}`;
@@ -49,6 +58,7 @@ export function DashboardPage() {
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
   const [sort, setSort] = useState<NoteSort>('recent');
+  const [tab, setTab] = useState<Tab>('mine');
   const [reloads, setReloads] = useState(0);
 
   const [notes, setNotes] = useState<Note[] | null>(null);
@@ -68,8 +78,10 @@ export function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    listNotes({ q: term, sort })
-      .then((found) => {
+    const load = tab === 'mine' ? listNotes : listSharedNotes;
+
+    load({ q: term, sort })
+      .then(({ notes: found }) => {
         if (cancelled) return;
 
         setNotes(found);
@@ -83,7 +95,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [term, sort, reloads]);
+  }, [term, sort, tab, reloads]);
 
   /** Ends the session and leaves, or reports why it could not. */
   async function handleLogout() {
@@ -157,8 +169,21 @@ export function DashboardPage() {
     }
   }
 
+  /** Moves to the other list, clearing what the last one left on screen. */
+  function showTab(next: Tab) {
+    if (next === tab) {
+      return;
+    }
+
+    setTab(next);
+    setNotes(null);
+    setNotice(null);
+    setError(null);
+  }
+
   const displayName = user?.name ?? user?.email ?? '';
   const searching = term !== '';
+  const mine = tab === 'mine';
 
   return (
     <div className="app-shell">
@@ -189,6 +214,27 @@ export function DashboardPage() {
           <h1>Everything worth remembering</h1>
         </div>
 
+        <div className="notes-tabs" role="tablist" aria-label="Which notes to show">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mine}
+            className={mine ? 'notes-tab notes-tab-current' : 'notes-tab'}
+            onClick={() => showTab('mine')}
+          >
+            Your notes
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!mine}
+            className={mine ? 'notes-tab' : 'notes-tab notes-tab-current'}
+            onClick={() => showTab('shared')}
+          >
+            Shared with you
+          </button>
+        </div>
+
         <div className="notes-bar">
           <div className="notes-filters">
             <label className="visually-hidden" htmlFor="notes-search">
@@ -198,7 +244,7 @@ export function DashboardPage() {
               id="notes-search"
               type="search"
               className="notes-search"
-              placeholder="Search your notes"
+              placeholder={mine ? 'Search your notes' : 'Search shared notes'}
               // the API refuses a longer term, and stopping it here beats
               // answering a search with "Validation failed"
               maxLength={191}
@@ -224,21 +270,27 @@ export function DashboardPage() {
           </div>
 
           <div className="notes-actions">
-            <ExportMenu disabled={busy} onChoose={(format) => void saveExport(format)} />
+            {/* export and import both act on the notes you own, so they are not
+                offered over a list of somebody else's */}
+            {mine && (
+              <>
+                <ExportMenu disabled={busy} onChoose={(format) => void saveExport(format)} />
 
-            {/* a label rather than a button reaching for a hidden input, so the
-                control announced is the file input itself */}
-            <label className="button button-ghost" htmlFor="notes-import">
-              Import JSON
-            </label>
-            <input
-              id="notes-import"
-              type="file"
-              accept="application/json,.json"
-              className="visually-hidden"
-              disabled={busy}
-              onChange={(event) => void handleImport(event)}
-            />
+                {/* a label rather than a button reaching for a hidden input, so the
+                    control announced is the file input itself */}
+                <label className="button button-ghost" htmlFor="notes-import">
+                  Import JSON
+                </label>
+                <input
+                  id="notes-import"
+                  type="file"
+                  accept="application/json,.json"
+                  className="visually-hidden"
+                  disabled={busy}
+                  onChange={(event) => void handleImport(event)}
+                />
+              </>
+            )}
 
             <Link className="button" to="/notes/new">
               New note
@@ -257,7 +309,7 @@ export function DashboardPage() {
 
         {error !== null && (
           <p className="form-error" role="alert">
-            Could not load your notes: {error}
+            Could not load {mine ? 'your notes' : 'the notes shared with you'}: {error}
           </p>
         )}
 
@@ -269,8 +321,12 @@ export function DashboardPage() {
 
         {notes !== null && notes.length === 0 && !searching && (
           <div className="empty-state">
-            <h2>A clean slate</h2>
-            <p>Nothing written yet. Start with a new note.</p>
+            <h2>{mine ? 'A clean slate' : 'Nothing shared yet'}</h2>
+            <p>
+              {mine
+                ? 'Nothing written yet. Start with a new note.'
+                : 'When somebody shares a note with you, it turns up here.'}
+            </p>
           </div>
         )}
 
@@ -288,7 +344,11 @@ export function DashboardPage() {
                 <Link className="note-card" to={`/notes/${note.id}`}>
                   <h2 className="note-card-title">{note.title}</h2>
                   <p className="note-card-excerpt">{plainText(note.content)}</p>
-                  <p className="note-card-date">{changed(note.updatedAt)}</p>
+                  <p className="note-card-date">
+                    {changed(note.updatedAt)}
+                    {!mine && ` - ${ownerName(note)}`}
+                    {note.permission === 'view' && ' - view only'}
+                  </p>
                 </Link>
               </li>
             ))}
