@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
 import { ApiError, byField, changePassword, maxPasswordLength } from '../api/client';
 import { FormField } from '../pages/FormField';
+import { useDismiss } from './useDismiss';
 
 export function ChangePasswordDialog({ onClose }: Readonly<{ onClose: () => void }>) {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -15,23 +16,7 @@ export function ChangePasswordDialog({ onClose }: Readonly<{ onClose: () => void
 
   const panel = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-
-    function handlePointer(event: MouseEvent) {
-      if (!panel.current?.contains(event.target as Node)) onClose();
-    }
-
-    document.addEventListener('keydown', handleKey);
-    document.addEventListener('mousedown', handlePointer);
-
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handlePointer);
-    };
-  }, [onClose]);
+  useDismiss(panel, onClose);
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();

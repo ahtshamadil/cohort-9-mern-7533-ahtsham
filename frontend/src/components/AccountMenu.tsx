@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { ChangePasswordDialog } from './ChangePasswordDialog';
+import { useDismiss } from './useDismiss';
 
 export function AccountMenu({ name }: Readonly<{ name: string }>) {
   const [open, setOpen] = useState(false);
@@ -9,34 +10,14 @@ export function AccountMenu({ name }: Readonly<{ name: string }>) {
   const wrapper = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handlePointer(event: MouseEvent) {
-      if (!wrapper.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKey(event: KeyboardEvent) {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
+  useDismiss(
+    wrapper,
+    () => {
       setOpen(false);
       trigger.current?.focus();
-    }
-
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('keydown', handleKey);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
+    },
+    open,
+  );
 
   return (
     <div className="menu" ref={wrapper}>

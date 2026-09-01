@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+
+import { useDismiss } from './useDismiss';
 
 /** Which of the two files the export button was asked for. */
 export type ExportFormat = 'json' | 'text';
@@ -26,36 +28,16 @@ export function ExportMenu({
   const wrapper = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handlePointer(event: MouseEvent) {
-      if (!wrapper.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKey(event: KeyboardEvent) {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
+  useDismiss(
+    wrapper,
+    () => {
       setOpen(false);
       // without this the focus is left on nothing once the menu unmounts, and a
       // keyboard user has to tab from the top of the page again
       trigger.current?.focus();
-    }
-
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('keydown', handleKey);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [open]);
+    },
+    open,
+  );
 
   return (
     <div className="menu" ref={wrapper}>
