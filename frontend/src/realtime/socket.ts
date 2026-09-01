@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
 
 /**
@@ -95,7 +95,9 @@ export interface UserHandlers {
 function useLatest<T>(handlers: T) {
   const latest = useRef(handlers);
 
-  useEffect(() => {
+  // layout rather than passive: a socket event is a plain callback and can run
+  // between the render and a passive effect, on handlers a render out of date
+  useLayoutEffect(() => {
     latest.current = handlers;
   });
 

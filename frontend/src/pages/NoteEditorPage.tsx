@@ -90,10 +90,15 @@ export function NoteEditorPage() {
       .then((note) => {
         if (cancelled) return;
 
-        setTitle(note.title);
-        setContent(note.content);
+        // a socket change can arrive while this request is in flight, and it is
+        // the newer of the two - the answer here is what the note was before it
+        if (seenAt.current === null || note.updatedAt > seenAt.current) {
+          setTitle(note.title);
+          setContent(note.content);
+          seenAt.current = note.updatedAt;
+        }
+
         setPermission(note.permission);
-        seenAt.current = note.updatedAt;
         setLoading(false);
       })
       .catch((cause: Error) => {
@@ -172,7 +177,10 @@ export function NoteEditorPage() {
       } else {
         const written = await updateNote(noteId, latest.current);
 
-        seenAt.current = written.updatedAt;
+        // only ever forward, for the same reason
+        if (seenAt.current === null || written.updatedAt > seenAt.current) {
+          seenAt.current = written.updatedAt;
+        }
       }
 
       setStatus('saved');
