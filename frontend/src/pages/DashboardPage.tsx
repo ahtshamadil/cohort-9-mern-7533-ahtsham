@@ -384,9 +384,7 @@ export function DashboardPage() {
 
         {/* the list changes without anything being clicked, so the count is
             announced rather than left to be noticed */}
-        <p className="visually-hidden" role="status">
-          {notes === null ? '' : counted(total)}
-        </p>
+        <output className="visually-hidden">{notes === null ? '' : counted(total)}</output>
 
         {notes !== null && notes.length === 0 && !searching && (
           <div className="empty-state">

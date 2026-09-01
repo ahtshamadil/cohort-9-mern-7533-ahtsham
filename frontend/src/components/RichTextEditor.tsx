@@ -13,7 +13,7 @@ export interface RichTextEditorProps {
 }
 
 /** The schemes the API's sanitiser keeps. A link written in anything else is dropped on save. */
-const linkSchemes = ['http:', 'https:', 'mailto:'];
+const linkSchemes = new Set(['http:', 'https:', 'mailto:']);
 
 /**
  * What was typed as a URL worth storing, or null if it is not one.
@@ -31,7 +31,7 @@ function asHref(typed: string): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
 
   try {
-    return linkSchemes.includes(new URL(withScheme).protocol) ? withScheme : null;
+    return linkSchemes.has(new URL(withScheme).protocol) ? withScheme : null;
   } catch {
     return null;
   }
@@ -90,7 +90,7 @@ const paths = {
  * but a button earns its place in the row only if it gets reached for.
  */
 type Control =
-  | { kind: 'divider' }
+  | { kind: 'divider'; after: string }
   | { kind: 'tool'; label: Label; shortcut: string; icon?: keyof typeof paths; text?: string };
 
 type Label =
@@ -115,27 +115,27 @@ const controls: Control[] = [
   { kind: 'tool', label: 'Heading 1', shortcut: 'Ctrl+Alt+1', text: 'H1' },
   { kind: 'tool', label: 'Heading 2', shortcut: 'Ctrl+Alt+2', text: 'H2' },
   { kind: 'tool', label: 'Heading 3', shortcut: 'Ctrl+Alt+3', text: 'H3' },
-  { kind: 'divider' },
+  { kind: 'divider', after: 'headings' },
   { kind: 'tool', label: 'Bold', shortcut: 'Ctrl+B', icon: 'bold' },
   { kind: 'tool', label: 'Italic', shortcut: 'Ctrl+I', icon: 'italic' },
   { kind: 'tool', label: 'Underline', shortcut: 'Ctrl+U', icon: 'underline' },
   { kind: 'tool', label: 'Strikethrough', shortcut: 'Ctrl+Shift+S', icon: 'strike' },
-  { kind: 'divider' },
+  { kind: 'divider', after: 'marks' },
   { kind: 'tool', label: 'Bullet list', shortcut: 'Ctrl+Shift+8', icon: 'bulletList' },
   { kind: 'tool', label: 'Numbered list', shortcut: 'Ctrl+Shift+7', icon: 'orderedList' },
   { kind: 'tool', label: 'Quote', shortcut: 'Ctrl+Shift+B', icon: 'quote' },
   { kind: 'tool', label: 'Code block', shortcut: 'Ctrl+Alt+C', icon: 'codeBlock' },
-  { kind: 'divider' },
+  { kind: 'divider', after: 'blocks' },
   { kind: 'tool', label: 'Align left', shortcut: 'Ctrl+Shift+L', icon: 'alignLeft' },
   { kind: 'tool', label: 'Align centre', shortcut: 'Ctrl+Shift+E', icon: 'alignCenter' },
   { kind: 'tool', label: 'Align right', shortcut: 'Ctrl+Shift+R', icon: 'alignRight' },
   { kind: 'tool', label: 'Justify', shortcut: 'Ctrl+Shift+J', icon: 'alignJustify' },
-  { kind: 'divider' },
+  { kind: 'divider', after: 'alignment' },
   { kind: 'tool', label: 'Link', shortcut: 'Ctrl+K', icon: 'link' },
 ];
 
 /** The note body editor, with a formatting toolbar above it. */
-export function RichTextEditor({ content, onChange, readOnly = false }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, readOnly = false }: Readonly<RichTextEditorProps>) {
   // the link row, rather than window.prompt: a prompt blocks the browser, and
   // jsdom answers it with undefined, so the feature could not be tested at all
   const [linking, setLinking] = useState(false);
@@ -310,10 +310,9 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
   return (
     <div className="editor">
       <div className="editor-toolbar" role="toolbar" aria-label="Formatting">
-        {controls.map((control, index) =>
+        {controls.map((control) =>
           control.kind === 'divider' ? (
-            // the row is a fixed list, so its position is a stable identity
-            <span key={`divider-${index}`} className="editor-tool-divider" />
+            <span key={`divider-${control.after}`} className="editor-tool-divider" />
           ) : (
             <button
               key={control.label}
@@ -390,10 +389,10 @@ export function RichTextEditor({ content, onChange, readOnly = false }: RichText
         </span>
 
         {full && (
-          <span className="editor-limit" role="status">
+          <output className="editor-limit">
             This note is nearly as large as one note can be. Splitting it in two beats
             finding out on a failed save.
-          </span>
+          </output>
         )}
       </div>
     </div>

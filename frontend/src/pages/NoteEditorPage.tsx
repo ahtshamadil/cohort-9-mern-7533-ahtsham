@@ -274,19 +274,18 @@ export function NoteEditorPage() {
           Back
         </button>
 
-        <span
+        <output
           className={status === 'failed' && !readOnly ? 'editor-status failed' : 'editor-status'}
-          role="status"
         >
           {readOnly ? 'View only' : wording[status]}
-        </span>
+        </output>
 
         {changedElsewhere && (
           <span className="editor-changed">
-            <span role="status">
+            <output>
               Somebody else changed this note while you were writing. What you have here is
               what gets saved.
-            </span>
+            </output>
             <button
               type="button"
               className="button button-ghost"
