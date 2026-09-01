@@ -263,11 +263,11 @@ describe('session tokens', () => {
   });
 
   it('refuses a token that has been cut about', () => {
-    expect(readToken(signToken(7, 3).split('.').slice(0, 2).join('.'))).to.equal(null);
+    expect(readToken(signToken(7, 3).split('.').slice(0, 2).join('.'))).to.be.null;
   });
 
   it('refuses rubbish', () => {
-    expect(readToken('not-a-token')).to.equal(null);
+    expect(readToken('not-a-token')).to.be.null;
   });
 });
 
