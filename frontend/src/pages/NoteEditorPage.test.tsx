@@ -13,6 +13,7 @@ const note = {
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-02T00:00:00.000Z',
   owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  pinned: false,
   permission: 'owner' as const,
 };
 

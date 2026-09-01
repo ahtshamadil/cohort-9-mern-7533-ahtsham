@@ -9,6 +9,7 @@ import {
   listNotes,
   listSharedNotes,
   plainText,
+  setPinned,
   type Note,
   type NoteSort,
 } from '../api/notes';
@@ -43,6 +44,11 @@ function changed(at: string): string {
   });
 }
 
+/** Pinned first, then whatever order the API sent them in. */
+function pinnedFirst(notes: Note[]): Note[] {
+  return [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+}
+
 /** Whoever owns a shared note, by name where they gave one. */
 function ownerName(note: Note): string {
   return note.owner.name ?? note.owner.email;
@@ -72,6 +78,8 @@ export function DashboardPage() {
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  // the note that has just been pinned, so only that card plays the animation
+  const [justPinned, setJustPinned] = useState<number | null>(null);
 
   // searching on every keystroke would be a request per letter. each one restarts
   // the timer, so only the last of a burst is ever asked for
@@ -95,7 +103,7 @@ export function DashboardPage() {
       .then(({ notes: found, total: matched }) => {
         if (cancelled) return;
 
-        setNotes(found);
+        setNotes(pinnedFirst(found));
         setTotal(matched);
         setError(null);
       })
@@ -138,6 +146,36 @@ export function DashboardPage() {
       // session is still live. saying so beats navigating away and leaving
       // someone believing they signed out on a shared machine when they did not
       setLogoutError('Could not log out. Check your connection and try again.');
+    }
+  }
+
+  /**
+   * Pins or unpins a note.
+   *
+   * The card moves before the API answers, because waiting a round trip to see
+   * a pin land makes the animation look like a fault. A refusal puts it back.
+   */
+  async function togglePin(note: Note) {
+    const pinned = !note.pinned;
+    // the list as it stands, to put back if the save is refused. rebuilding it
+    // from the changed one would restore the pin but not the order it was in
+    const before = notes;
+
+    setNotes((current) =>
+      current === null
+        ? current
+        : pinnedFirst(current.map((held) => (held.id === note.id ? { ...held, pinned } : held))),
+    );
+
+    if (pinned) {
+      setJustPinned(note.id);
+    }
+
+    try {
+      await setPinned(note.id, pinned);
+    } catch {
+      setNotes(before);
+      setNotice({ text: 'Could not change that pin. Try again.', failed: true });
     }
   }
 
@@ -371,7 +409,13 @@ export function DashboardPage() {
         {notes !== null && notes.length > 0 && (
           <ul className="note-list">
             {notes.map((note) => (
-              <li key={note.id}>
+              <li
+                key={note.id}
+                className={
+                  note.pinned && note.id === justPinned ? 'note-item pinning' : 'note-item'
+                }
+                onAnimationEnd={() => setJustPinned(null)}
+              >
                 <Link className="note-card" to={`/notes/${note.id}`}>
                   <h2 className="note-card-title">{note.title}</h2>
                   <p className="note-card-excerpt">{plainText(note.content)}</p>
@@ -381,6 +425,29 @@ export function DashboardPage() {
                     {note.permission === 'view' && ' - view only'}
                   </p>
                 </Link>
+
+                {/* only the owner may pin, and the button sits outside the link
+                    rather than inside it - a button within an anchor is not
+                    valid, and clicking it would follow the link as well */}
+                {mine && (
+                  <button
+                    type="button"
+                    className={note.pinned ? 'pin-button pinned' : 'pin-button'}
+                    aria-pressed={note.pinned}
+                    aria-label={note.pinned ? `Unpin ${note.title}` : `Pin ${note.title}`}
+                    onClick={() => void togglePin(note)}
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                      <path
+                        d="M9 4h6l-1 5 3 3v2h-4v5l-1 1-1-1v-5H7v-2l3-3z"
+                        fill={note.pinned ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )}
               </li>
             ))}
           </ul>

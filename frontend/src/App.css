@@ -737,6 +737,99 @@
   box-shadow: var(--shadow-sm);
 }
 
+.note-item {
+  position: relative;
+}
+
+/* the pin sits over the top corner of the card, clear of the title's text */
+.pin-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--ease), color var(--ease), background-color var(--ease);
+}
+
+/* shown on hover, but a pinned one stays put - it is the state, not a control */
+.note-item:hover .pin-button,
+.pin-button:focus-visible,
+.pin-button.pinned {
+  opacity: 1;
+}
+
+.pin-button:hover {
+  background-color: var(--surface-sunken, rgb(0 0 0 / 5%));
+  color: var(--ink);
+}
+
+.pin-button.pinned {
+  color: var(--accent);
+}
+
+.pin-button.pinned svg {
+  animation: pin-press 320ms ease-out;
+}
+
+.note-item.pinning .note-card {
+  animation: pin-drop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+/* a pinned card reads as one pushed onto a board rather than lying in a list */
+.pin-button.pinned ~ .note-card,
+.note-item:has(.pin-button.pinned) .note-card {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+@keyframes pin-press {
+  0% {
+    transform: rotate(-28deg) scale(0.75);
+  }
+
+  55% {
+    transform: rotate(6deg) scale(1.15);
+  }
+
+  100% {
+    transform: rotate(0) scale(1);
+  }
+}
+
+/* down onto the board, a small bounce as it settles, then straight */
+@keyframes pin-drop {
+  0% {
+    transform: translateY(-10px) rotate(-2deg) scale(1.04);
+    box-shadow: var(--shadow-md);
+  }
+
+  55% {
+    transform: translateY(3px) rotate(1deg) scale(0.99);
+  }
+
+  100% {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* the movement is decoration - the pin still lands, it just does not travel */
+@media (prefers-reduced-motion: reduce) {
+  .note-item.pinning .note-card,
+  .pin-button.pinned svg {
+    animation: none;
+  }
+}
+
 .note-card-title {
   margin: 0;
   font-size: 1rem;

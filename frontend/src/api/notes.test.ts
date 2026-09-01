@@ -104,7 +104,8 @@ describe('updateNote', () => {
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-02T00:00:00.000Z',
     owner: { id: 1, email: 'ahtsham@example.com', name: null },
-    permission: 'owner' as const,
+    pinned: false,
+  permission: 'owner' as const,
   };
 
   /** What the stub was called with, so the headers can be read back. */
@@ -168,6 +169,7 @@ describe('canEdit', () => {
     content: '',
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-02T00:00:00.000Z',
+    pinned: false,
     owner: { id: 1, email: 'ahtsham@example.com', name: null },
   };
 
@@ -213,7 +215,8 @@ describe('notesToText', () => {
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-02T00:00:00.000Z',
     owner: { id: 1, email: 'ahtsham@example.com', name: null },
-    permission: 'owner',
+    pinned: false,
+  permission: 'owner',
   };
 
   it('heads each note with a rule, its title and its date', () => {

@@ -19,6 +19,7 @@ export interface Note {
   id: number;
   title: string;
   content: string;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   owner: UserSummary;
@@ -46,6 +47,11 @@ export function canEdit(note: Note): boolean {
 export interface NoteInput {
   title: string;
   content: string;
+}
+
+/** What a patch may change. Pinning is the owner's, so it travels on its own. */
+export interface NoteChanges extends Partial<NoteInput> {
+  pinned?: boolean;
 }
 
 /** The orders GET /api/notes will sort by. */
@@ -142,7 +148,7 @@ export async function createNote(input: NoteInput): Promise<Note> {
 }
 
 /** Changes the fields it is given and leaves the rest alone. */
-export async function updateNote(id: number, input: Partial<NoteInput>): Promise<Note> {
+export async function updateNote(id: number, input: NoteChanges): Promise<Note> {
   const from = socketId();
 
   const { note } = await apiFetch<{ note: Note }>(`/api/notes/${id}`, {
@@ -155,6 +161,11 @@ export async function updateNote(id: number, input: Partial<NoteInput>): Promise
   });
 
   return note;
+}
+
+/** Pins a note to the top of the owner's list, or takes the pin off. */
+export function setPinned(id: number, pinned: boolean): Promise<Note> {
+  return updateNote(id, { pinned });
 }
 
 /** Removes a note for good. */
