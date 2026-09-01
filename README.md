@@ -121,6 +121,54 @@ There are no ids in it, so the file can be loaded into a different account.
 the dates each note was written with, and answers with how many arrived. One bad note
 rejects the whole file rather than importing half of it.
 
+### Live updates
+
+A Socket.IO server runs on the same port as the API, at `/api/socket.io` rather than
+the default `/socket.io` so one dev proxy rule covers both. It uses the same session
+cookie the routes do - a socket with no valid cookie is refused the handshake, and one
+whose token runs out mid-connection is dropped.
+
+A socket asks to join the notes it wants to hear about:
+
+```js
+const answer = await socket.emitWithAck('note:join', { noteId: 9 });
+// { ok: true } or { ok: false, error: 'Note not found' }
+```
+
+Joining is checked against the same rule the API uses for reading a note, and it is
+checked on every join rather than once at connect - a room joined an hour ago is no
+evidence that the share behind it still stands. Every socket is also put in a room of
+its own account, which is how it hears about sharing.
+
+| Event | Goes to | Carries |
+| --- | --- | --- |
+| `note:updated` | everybody in the note | `id`, `title`, `content`, `updatedAt` |
+| `note:deleted` | everybody in the note | `id` |
+| `share:granted` | the account it was shared with | `noteId` |
+| `share:revoked` | the account it was taken from | `noteId` |
+
+`note:updated` carries no `owner` and no `permission`. Both are worked out per reader -
+the same note is `owner` to one account and `view` to another - so neither can go in a
+message two people receive. A client merges the fields it is sent into the copy it
+already holds and keeps the permission it was given. Sharing events carry only a
+`noteId` for the same reason: the recipient asks for the note and gets it shaped for
+them.
+
+Saving a note sends `note:updated` to everyone else in it. Send the header
+`x-socket-id` with the `PATCH` and that socket is left out of the broadcast, which is
+what stops an editor's own autosave landing back on top of whatever has been typed
+since. Without the header a client simply hears its own change.
+
+Taking a share back removes that account from the note's room as well as telling it.
+Otherwise a socket that joined while the share stood would keep receiving the note
+after it was taken away.
+
+Rooms are held in memory in the one server process, which is what this deployment is.
+Running more than one would need an adapter so they share what is in each room.
+
+In development the frontend talks to Vite, which forwards `/api` to the backend, so
+that proxy rule needs `ws: true` for the socket to get through.
+
 ### Sessions
 
 When you log in the token goes into a cookie, not into the response body. The cookie
