@@ -4,10 +4,12 @@ import { env } from '../config/env.js';
 
 const ALGORITHM = 'HS256';
 
-/** What a valid token says: who it is for, and which generation of it. */
+/** What a valid token says: who it is for, which generation, and until when. */
 export interface Session {
   userId: number;
   tokenVersion: number;
+  /** When the token stops being valid, in milliseconds. */
+  expiresAt: number;
 }
 
 /** Signs a session token for a user. */
@@ -24,7 +26,7 @@ export function readToken(token: string): Session | null {
   try {
     const payload = jwt.verify(token, env.jwtSecret, { algorithms: [ALGORITHM] });
 
-    if (typeof payload === 'string' || payload.sub === undefined) {
+    if (typeof payload === 'string' || payload.sub === undefined || payload.exp === undefined) {
       return null;
     }
 
@@ -35,7 +37,7 @@ export function readToken(token: string): Session | null {
       return null;
     }
 
-    return { userId, tokenVersion: ver as number };
+    return { userId, tokenVersion: ver as number, expiresAt: payload.exp * 1000 };
   } catch {
     return null;
   }

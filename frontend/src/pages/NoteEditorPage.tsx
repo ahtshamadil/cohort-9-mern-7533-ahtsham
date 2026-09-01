@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError, byField } from '../api/client';
-import { createNote, deleteNote, getNote, updateNote } from '../api/notes';
+import { createNote, deleteNote, getNote, updateNote, type NotePermission } from '../api/notes';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { ShareDialog } from '../components/ShareDialog';
 import { FormField } from './FormField';
 
 /** How long to wait after the last keystroke before saving. */
@@ -27,11 +28,17 @@ export function NoteEditorPage() {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  // a note being written is yours until it exists, so this starts at owner
+  const [permission, setPermission] = useState<NotePermission>('owner');
+  const [sharing, setSharing] = useState(false);
   const [loading, setLoading] = useState(noteId !== null);
   const [status, setStatus] = useState<Status>('saved');
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const readOnly = permission === 'view';
+  const owned = permission === 'owner';
 
   // the pending save reads these rather than the state it closed over, so a
   // keystroke landing while it waits is not left behind
@@ -55,6 +62,7 @@ export function NoteEditorPage() {
 
         setTitle(note.title);
         setContent(note.content);
+        setPermission(note.permission);
         setLoading(false);
       })
       .catch((cause: Error) => {
@@ -120,6 +128,11 @@ export function NoteEditorPage() {
 
   /** Called on every edit. Existing notes save themselves, new ones wait. */
   function changed() {
+    // a view-only share cannot be written, so nothing here should reach the API
+    if (readOnly) {
+      return;
+    }
+
     setStatus('unsaved');
 
     if (noteId === null) {
@@ -133,7 +146,7 @@ export function NoteEditorPage() {
   /** Leaves, but not before whatever is still pending has gone up. */
   async function handleBack() {
     // failed counts as pending - the text is still only in the browser
-    if ((status === 'unsaved' || status === 'failed') && noteId !== null) {
+    if (!readOnly && (status === 'unsaved' || status === 'failed') && noteId !== null) {
       // staying put beats navigating away from work that never reached the server
       if (!(await save())) {
         return;
@@ -175,11 +188,22 @@ export function NoteEditorPage() {
         </button>
 
         <span className="muted" role="status">
-          {wording[status]}
+          {readOnly ? 'View only' : wording[status]}
         </span>
 
         <div className="editor-bar-actions">
-          {noteId !== null &&
+          {owned && noteId !== null && (
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setSharing(true)}
+            >
+              Share
+            </button>
+          )}
+
+          {owned &&
+            noteId !== null &&
             (confirming ? (
               <>
                 <span className="muted">Delete this note?</span>
@@ -208,16 +232,22 @@ export function NoteEditorPage() {
               </button>
             ))}
 
-          <button
-            type="button"
-            className="button"
-            disabled={status === 'saving'}
-            onClick={() => void save()}
-          >
-            Save
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="button"
+              disabled={status === 'saving'}
+              onClick={() => void save()}
+            >
+              Save
+            </button>
+          )}
         </div>
       </div>
+
+      {sharing && noteId !== null && (
+        <ShareDialog noteId={noteId} onClose={() => setSharing(false)} />
+      )}
 
       {error !== null && (
         <p className="form-error" role="alert">
@@ -225,20 +255,25 @@ export function NoteEditorPage() {
         </p>
       )}
 
-      <FormField
-        id="note-title"
-        label="Title"
-        value={title}
-        placeholder="Give it a name"
-        error={fieldErrors.title}
-        onChange={(value) => {
-          setTitle(value);
-          changed();
-        }}
-      />
+      {readOnly ? (
+        <h1 className="note-title-read">{title}</h1>
+      ) : (
+        <FormField
+          id="note-title"
+          label="Title"
+          value={title}
+          placeholder="Give it a name"
+          error={fieldErrors.title}
+          onChange={(value) => {
+            setTitle(value);
+            changed();
+          }}
+        />
+      )}
 
       <RichTextEditor
         content={content}
+        readOnly={readOnly}
         onChange={(html) => {
           setContent(html);
           changed();

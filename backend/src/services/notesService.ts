@@ -300,6 +300,16 @@ export async function getNote(userId: number, id: number): Promise<Note> {
   return toNote(note, userId);
 }
 
+/** Whether the user may read a note, for a caller that wants no note back. */
+export async function canReadNote(userId: number, id: number): Promise<boolean> {
+  const note = await prisma.note.findFirst({
+    where: { id, ...readable(userId) },
+    select: { id: true },
+  });
+
+  return note !== null;
+}
+
 /** Creates a note owned by the user. */
 export async function createNote(authorId: number, input: CreateNoteInput): Promise<Note> {
   const data = parseOrThrow(createNoteSchema, input);

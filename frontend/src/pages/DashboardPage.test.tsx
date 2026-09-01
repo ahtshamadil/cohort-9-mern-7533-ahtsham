@@ -11,6 +11,8 @@ const note = {
   content: '<p>Milk and bread</p>',
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-02T00:00:00.000Z',
+  owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  permission: 'owner' as const,
 };
 
 const other = {
@@ -19,9 +21,11 @@ const other = {
   content: '<p>A better mousetrap</p>',
   createdAt: '2026-08-03T00:00:00.000Z',
   updatedAt: '2026-08-04T00:00:00.000Z',
+  owner: { id: 1, email: 'ahtsham@example.com', name: null },
+  permission: 'owner' as const,
 };
 
-const both = { status: 200, body: { notes: [note, other] } };
+const both = { status: 200, body: { notes: [note, other], total: 2 } };
 
 describe('DashboardPage', () => {
   afterEach(() => {
@@ -30,7 +34,7 @@ describe('DashboardPage', () => {
   });
 
   it('lists the notes it gets back', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note] } } });
+    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
 
     renderApp('/');
 
@@ -38,7 +42,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows the body as text rather than as markup', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note] } } });
+    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
 
     renderApp('/');
 
@@ -48,7 +52,7 @@ describe('DashboardPage', () => {
   });
 
   it('offers a clean slate when there are none', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [] } } });
+    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
 
     renderApp('/');
 
@@ -66,7 +70,7 @@ describe('DashboardPage', () => {
   it('opens a note when its card is clicked', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [note] } },
+      'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
       'GET /api/notes/1': { status: 200, body: { note } },
     });
 
@@ -80,7 +84,7 @@ describe('DashboardPage', () => {
   });
 
   it('links to a blank editor for a new note', async () => {
-    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [] } } });
+    stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [], total: 0 } } });
 
     renderApp('/');
 
@@ -93,7 +97,7 @@ describe('DashboardPage', () => {
   it('says so and stays put when logging out fails', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [] } },
+      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
       // the server is unreachable, so the cookie is still sitting there and the
       // session is still live. navigating away would tell somebody on a shared
       // machine they had signed out when they had not
@@ -113,7 +117,7 @@ describe('DashboardPage', () => {
   it('returns to the log-in screen after logging out', async () => {
     stubApi({
       ...signedIn,
-      'GET /api/notes': { status: 200, body: { notes: [] } },
+      'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
       'POST /api/auth/logout': { status: 204 },
     });
 
@@ -129,7 +133,7 @@ describe('DashboardPage', () => {
     stubApi({
       ...signedIn,
       'GET /api/notes': both,
-      'GET /api/notes?q=milk': { status: 200, body: { notes: [note] } },
+      'GET /api/notes?q=milk': { status: 200, body: { notes: [note], total: 1 } },
     });
 
     renderApp('/');
@@ -151,7 +155,7 @@ describe('DashboardPage', () => {
     stubApi({
       ...signedIn,
       'GET /api/notes': both,
-      'GET /api/notes?q=zzz': { status: 200, body: { notes: [] } },
+      'GET /api/notes?q=zzz': { status: 200, body: { notes: [], total: 0 } },
     });
 
     renderApp('/');
@@ -170,7 +174,7 @@ describe('DashboardPage', () => {
     stubApi({
       ...signedIn,
       'GET /api/notes': both,
-      'GET /api/notes?sort=title': { status: 200, body: { notes: [other] } },
+      'GET /api/notes?sort=title': { status: 200, body: { notes: [other], total: 1 } },
     });
 
     renderApp('/');
@@ -330,5 +334,142 @@ describe('DashboardPage', () => {
 
     const alerts = await screen.findAllByRole('alert');
     expect(within(alerts[0]).getByText(/Unsupported export version/)).toBeInTheDocument();
+  });
+
+  describe('the shared list', () => {
+    const theirs = {
+      id: 9,
+      title: 'Rota',
+      content: '<p>Tuesday is yours</p>',
+      createdAt: '2026-08-05T00:00:00.000Z',
+      updatedAt: '2026-08-06T00:00:00.000Z',
+      owner: { id: 2, email: 'someone@example.com', name: 'Sam' },
+      permission: 'view' as const,
+    };
+
+    const shared = { status: 200, body: { notes: [theirs], total: 1 } };
+
+    it('starts on your own notes rather than the shared ones', async () => {
+      stubApi({ ...signedIn, 'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } } });
+
+      renderApp('/');
+
+      expect(await screen.findByRole('heading', { name: 'Shopping' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Your notes' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('asks the shared route once that tab is chosen', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 200, body: { notes: [note], total: 1 } },
+        'GET /api/notes/shared': shared,
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('heading', { name: 'Shopping' });
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+      // the previous list is gone rather than showing under the other tab
+      expect(screen.queryByRole('heading', { name: 'Shopping' })).not.toBeInTheDocument();
+    });
+
+    it('says whose note it is and that it cannot be changed', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared': shared,
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('tab', { name: 'Shared with you' });
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      const card = await screen.findByRole('heading', { name: 'Rota' });
+      expect(within(card.closest('a') as HTMLElement).getByText(/Sam/)).toBeInTheDocument();
+      expect(within(card.closest('a') as HTMLElement).getByText(/view only/)).toBeInTheDocument();
+    });
+
+    it('does not offer export or import over notes you do not own', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared': shared,
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('tab', { name: 'Shared with you' });
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Rota' });
+
+      expect(screen.queryByRole('button', { name: /Export/ })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Import JSON')).not.toBeInTheDocument();
+    });
+
+    it('says nothing is shared rather than showing the empty slate', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared': { status: 200, body: { notes: [], total: 0 } },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('tab', { name: 'Shared with you' });
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      expect(await screen.findByText('Nothing shared yet')).toBeInTheDocument();
+    });
+
+    it('does not blame the shared list for a failure on your own', async () => {
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 0, networkError: true },
+        'GET /api/notes/shared': { ...shared, delayMs: 300 },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('alert');
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+
+      // the shared list is still in flight, so nothing about it has failed yet
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Rota' })).toBeInTheDocument();
+    });
+
+    it('searches the shared list rather than your own', async () => {
+      const match = { ...theirs, id: 10, title: 'Rota changes' };
+
+      stubApi({
+        ...signedIn,
+        'GET /api/notes': { status: 200, body: { notes: [], total: 0 } },
+        'GET /api/notes/shared': shared,
+        'GET /api/notes/shared?q=rota': { status: 200, body: { notes: [match], total: 1 } },
+      });
+
+      renderApp('/');
+      const user = userEvent.setup();
+      await screen.findByRole('tab', { name: 'Shared with you' });
+
+      await user.click(screen.getByRole('tab', { name: 'Shared with you' }));
+      await screen.findByRole('heading', { name: 'Rota' });
+
+      await user.type(screen.getByLabelText('Search notes'), 'rota');
+
+      // only the shared search answers with this note, so finding it is the assertion
+      expect(await screen.findByRole('heading', { name: 'Rota changes' })).toBeInTheDocument();
+    });
   });
 });

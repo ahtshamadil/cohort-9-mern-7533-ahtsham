@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { shareLimiter } from '../middleware/rateLimit.js';
 import { currentUserId, requireAuth } from '../middleware/requireAuth.js';
+import { noteDeleted, noteUpdated, shareGranted, shareRevoked } from '../realtime/socket.js';
 import { validateBody } from '../middleware/validate.js';
 import {
   createNote,
@@ -102,11 +103,19 @@ notesRouter.patch('/:id', validateBody(updateNoteSchema), async (req, res) => {
   const body: UpdateNoteInput = req.body;
   const note = await updateNote(currentUserId(req), noteId(req.params.id), body);
 
+  // the save arrives over http, so the socket that made it can only be left out
+  // of the broadcast if the client says which one it was. it is taken as a
+  // claim, not a fact - the id is only honoured if it belongs to this account
+  noteUpdated(note, currentUserId(req), req.get('x-socket-id'));
+
   res.json({ note });
 });
 
 notesRouter.delete('/:id', async (req, res) => {
-  await deleteNote(currentUserId(req), noteId(req.params.id));
+  const id = noteId(req.params.id);
+
+  await deleteNote(currentUserId(req), id);
+  noteDeleted(id);
 
   res.status(204).send();
 });
@@ -119,18 +128,21 @@ notesRouter.get('/:id/shares', async (req, res) => {
 
 notesRouter.post('/:id/shares', shareLimiter, validateBody(shareNoteSchema), async (req, res) => {
   const body: ShareNoteInput = req.body;
-  const { share, created } = await shareNote(currentUserId(req), noteId(req.params.id), body);
+  const id = noteId(req.params.id);
+  const { share, created } = await shareNote(currentUserId(req), id, body);
+
+  shareGranted(share.user.id, id);
 
   // 201 says a new share was made, 200 that an existing one now grants something else
   res.status(created ? 201 : 200).json({ share });
 });
 
 notesRouter.delete('/:id/shares/:userId', async (req, res) => {
-  await unshareNote(
-    currentUserId(req),
-    noteId(req.params.id),
-    wholeNumber(req.params.userId, 'User id'),
-  );
+  const id = noteId(req.params.id);
+  const targetUserId = wholeNumber(req.params.userId, 'User id');
+
+  await unshareNote(currentUserId(req), id, targetUserId);
+  shareRevoked(targetUserId, id);
 
   res.status(204).send();
 });
