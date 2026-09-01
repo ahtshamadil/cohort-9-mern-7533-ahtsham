@@ -102,5 +102,15 @@ live in `sonar-project.properties` at the repository root; the generated Prisma
 client and Prisma's own migration SQL are excluded, since neither is code
 anybody here maintains.
 
-`metrics.json` in this folder is the raw measures response behind the table
-above. Screenshots of the dashboard are in `screenshots/`.
+## What is in this folder
+
+SonarQube Community has no exportable report of its own - the PDF executive
+report is an Enterprise feature - so the machine-generated evidence here is the
+Web API's own output, and this file is the write-up around it.
+
+| File | What it is |
+| --- | --- |
+| `metrics.json` | `/api/measures/component` - the numbers in the table above |
+| `issues.json` | `/api/issues/search` - the four open smells, unfiltered |
+| `quality-gate.json` | `/api/qualitygates/project_status` - the gate and its conditions |
+| `screenshots/` | The dashboard: gate, overall measures, issue count over time, coverage per file |
