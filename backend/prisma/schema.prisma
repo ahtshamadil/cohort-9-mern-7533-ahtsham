@@ -16,6 +16,10 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  // bumped when the password changes, and carried in every token. a token
+  // holding an older number stops verifying, which is what logs the other
+  // sessions out - a jwt cannot be withdrawn any other way
+  tokenVersion Int      @default(0)
   notes        Note[]
   sharedWithMe NoteShare[]
   createdAt    DateTime @default(now())

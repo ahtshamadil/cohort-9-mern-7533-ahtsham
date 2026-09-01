@@ -71,6 +71,7 @@ CORS setup of its own.
 | POST | `/api/auth/login` | Signs an existing account in |
 | POST | `/api/auth/logout` | Signs out |
 | GET | `/api/auth/me` | Returns the signed-in user, 401 if nobody is |
+| PATCH | `/api/auth/password` | Changes the password and signs the other sessions out |
 | GET | `/api/notes` | Lists your notes, newest change first |
 | POST | `/api/notes` | Writes a new note |
 | GET | `/api/notes/:id` | Returns one note |
@@ -137,9 +138,44 @@ It is also `SameSite=Lax`, so another site can't post a form to the API and have
 browser attach the cookie to it.
 
 The token lasts 7 days, set by `JWT_EXPIRES_IN_SECONDS`. The cookie's max-age uses the
-same value so the two expire together. Logging out clears the cookie, but the token
-itself stays valid until it runs out - you can't cancel a JWT once it's issued. That's
-the trade-off for not having to look up a session on every request.
+same value so the two expire together.
+
+Logging out clears the cookie, but the token itself stays valid until it runs out. To
+withdraw one before then, every account carries a `tokenVersion`, and every token carries
+the number it was signed with. Changing the password increments it, so the tokens signed
+with the old number stop verifying and the other sessions are done. The session doing the
+changing gets a fresh cookie, so it stays signed in.
+
+That costs a lookup per request, which the earlier version deliberately avoided. There is
+no way to have both: a token that can be withdrawn has to be checked against something.
+
+### Rate limits
+
+Nothing stopped a script working through passwords at full speed, so there are three
+limits, all per IP over 15 minutes:
+
+- the auth routes, 10 attempts - login, register and changing a password
+- sharing, 20 attempts - it is the one route that reacts to an address existing
+- everything else, 300
+
+Over the limit is a 429 in the same error envelope as everything else. Tests run with the
+limits set high, and `createLimiter` builds one directly so the behaviour is still tested.
+
+`req.ip` is what they count, and it is only as trustworthy as `TRUST_PROXY` says. It is 0
+by default, meaning no proxy in front. Setting it when nothing is really there lets a
+caller send `X-Forwarded-For` and look like a new client on every request.
+
+### Passwords
+
+Eight characters or more, and at most 72 bytes. The cap is not arbitrary - bcrypt reads
+72 bytes and ignores the rest, so without it two different passwords sharing a 72 byte
+prefix both open the same account. Bytes, not characters, because that is what bcrypt
+counts and a four byte character reaches the cap in 18 of them.
+
+The few hundred passwords every credential stuffing list opens with are refused. That is
+not a strength meter, it just removes the guesses worth trying first.
+
+Changing a password needs the current one, and the new one has to be different.
 
 ### A few things worth knowing
 
@@ -197,11 +233,12 @@ Inside `backend/src`:
 
 - `config/` - reads env variables
 - `db/` - the Prisma client and a reachability probe
-- `middleware/` - request logging, error handling, validation, the auth guard
+- `middleware/` - request logging, error handling, validation, the auth guard, rate limits
 - `routes/` - the endpoints
 - `services/` - the work behind the endpoints, kept out of the route handlers
 - `types/` - extra typings, currently the user id that the auth guard attaches
-- `utils/` - logger, password hashing, tokens, the session cookie, html to text
+- `utils/` - logger, password hashing, tokens, the session cookie, html to text,
+  the common password list
 - `app.ts` - builds the express app
 - `index.ts` - starts the server
 

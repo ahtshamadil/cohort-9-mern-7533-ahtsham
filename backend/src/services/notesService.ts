@@ -394,7 +394,12 @@ export async function shareNote(
   const recipient = await findUserByEmail(email);
 
   if (recipient === null) {
-    throw new HttpError(404, 'No account with that email');
+    // deliberately the same wording whichever of the two was wrong. it does not
+    // close the hole - the share list still shows who was added - but it stops
+    // the route being a plain yes/no oracle for whether an address has an
+    // account. the rate limit on it is what does the real work
+    logger.warn({ userId, noteId: id }, 'Share attempted for an unknown address');
+    throw new HttpError(404, 'That note could not be shared with that address');
   }
 
   if (recipient.id === userId) {
@@ -417,11 +422,7 @@ export async function shareNote(
 }
 
 /** Removes a share. The owner may take it back, and the reader may drop it. */
-export async function unshareNote(
-  userId: number,
-  id: number,
-  targetUserId: number,
-): Promise<void> {
+export async function unshareNote(userId: number, id: number, targetUserId: number): Promise<void> {
   // giving a note back does not need the owner's permission
   if (targetUserId !== userId) {
     await ownedOrThrow(userId, id);
