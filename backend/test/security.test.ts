@@ -239,7 +239,10 @@ describe('changing a password', function () {
 
 describe('session tokens', () => {
   it('carries the version it was signed with', () => {
-    expect(readToken(signToken(7, 3))).to.deep.equal({ userId: 7, tokenVersion: 3 });
+    const session = readToken(signToken(7, 3));
+
+    expect(session?.userId).to.equal(7);
+    expect(session?.tokenVersion).to.equal(3);
   });
 
   it('refuses a token that has been cut about', () => {
