@@ -180,6 +180,37 @@ describe('realtime', function () {
       expect(failure).to.be.an('error').with.property('message', 'Authentication required');
     });
 
+    it('refuses a socket whose session has been withdrawn', async () => {
+      const cookie = await signIn('ahtsham@example.com');
+
+      // the socket would connect on this cookie a moment ago
+      await connected(open(cookie));
+
+      await request(server)
+        .patch('/api/auth/password')
+        .set('Cookie', cookie)
+        .send({ currentPassword: password, newPassword: 'a whole new secret' });
+
+      const failure = await connected(open(cookie)).catch((cause: Error) => cause);
+
+      expect(failure).to.be.an('error').with.property('message', 'Authentication required');
+    });
+
+    it('drops a socket already open when the password changes', async () => {
+      const cookie = await signIn('ahtsham@example.com');
+      const socket = await connected(open(cookie));
+
+      // listened for before the change, so the disconnect cannot be missed
+      const dropped = nextEvent<string>(socket, 'disconnect');
+
+      await request(server)
+        .patch('/api/auth/password')
+        .set('Cookie', cookie)
+        .send({ currentPassword: password, newPassword: 'a whole new secret' });
+
+      expect(await dropped).to.equal('io server disconnect');
+    });
+
     it('refuses a socket whose token does not verify', async () => {
       const failure = await connected(open('token=not-a-real-token')).catch(
         (cause: Error) => cause,

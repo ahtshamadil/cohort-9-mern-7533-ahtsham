@@ -13,6 +13,7 @@ export function FormField({
   placeholder,
   required = true,
   autoFocus = false,
+  maxLength,
 }: Readonly<{
   id: string;
   label: string;
@@ -24,6 +25,7 @@ export function FormField({
   placeholder?: string;
   required?: boolean;
   autoFocus?: boolean;
+  maxLength?: number;
 }>) {
   const isPassword = type === 'password';
   const [revealed, setRevealed] = useState(false);
@@ -57,6 +59,7 @@ export function FormField({
           type={isPassword && revealed ? 'text' : type}
           className={isPassword ? 'has-affix' : undefined}
           value={value}
+          maxLength={maxLength}
           onChange={(event) => onChange(event.target.value)}
           onKeyUp={checkCapsLock}
           onKeyDown={checkCapsLock}

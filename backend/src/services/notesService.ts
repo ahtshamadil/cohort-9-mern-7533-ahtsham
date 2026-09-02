@@ -20,6 +20,7 @@ export interface Note {
   id: number;
   title: string;
   content: string;
+  pinned: boolean;
   createdAt: Date;
   updatedAt: Date;
   owner: UserSummary;
@@ -43,6 +44,7 @@ export interface Share {
 export interface ExportedNote {
   title: string;
   content: string;
+  pinned: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,10 +93,14 @@ export const createNoteSchema = z.object({
 
 /** What updateNote accepts. At least one field has to be present. */
 export const updateNoteSchema = z
-  .object({ title: title.optional(), content: content.optional() })
+  .object({
+    title: title.optional(),
+    content: content.optional(),
+    pinned: z.boolean().optional(),
+  })
   .refine(
-    (body) => body.title !== undefined || body.content !== undefined,
-    'Give a title or content to change',
+    (body) => body.title !== undefined || body.content !== undefined || body.pinned !== undefined,
+    'Give a title, content or pinned to change',
   );
 
 /** What sharing a note accepts. The route validates against this too. */
@@ -142,6 +148,8 @@ export const importSchema = z.object({
       z.object({
         title,
         content: content.default(''),
+        // absent in a file written before pinning existed, which still imports
+        pinned: z.boolean().default(false),
         createdAt: z.coerce.date().optional(),
         updatedAt: z.coerce.date().optional(),
       }),
@@ -160,6 +168,7 @@ function noteFields(userId: number) {
     id: true,
     title: true,
     content: true,
+    pinned: true,
     createdAt: true,
     updatedAt: true,
     authorId: true,
@@ -172,6 +181,7 @@ interface NoteRow {
   id: number;
   title: string;
   content: string;
+  pinned: boolean;
   createdAt: Date;
   updatedAt: Date;
   authorId: number;
@@ -185,6 +195,7 @@ function toNote(row: NoteRow, userId: number): Note {
     id: row.id,
     title: row.title,
     content: row.content,
+    pinned: row.pinned,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     owner: row.author,
@@ -207,6 +218,7 @@ function writable(userId: number) {
 const exportFields = {
   title: true,
   content: true,
+  pinned: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -252,7 +264,8 @@ async function listBy(
   const [rows, total] = await Promise.all([
     prisma.note.findMany({
       where: filter,
-      orderBy: ordering[sort],
+      // pinned first whatever the sort is, which is the point of pinning
+      orderBy: [{ pinned: 'desc' }, ordering[sort]],
       select: noteFields(userId),
       ...(paged ? { skip: ((page ?? 1) - 1) * size, take: size } : {}),
     }),
@@ -319,10 +332,14 @@ export async function updateNote(
 ): Promise<Note> {
   const data = parseOrThrow(updateNoteSchema, input);
 
+  // pinning is the owner's own ordering of their list, not something an edit
+  // share hands over, so changing it needs more than being able to write
+  const allowed = data.pinned === undefined ? writable(userId) : { authorId: userId };
+
   // the permission is part of the write rather than a read then a write, so a
   // share cannot be revoked in the gap between checking it and using it
   const { count } = await prisma.note.updateMany({
-    where: { id, ...writable(userId) },
+    where: { id, ...allowed },
     data: {
       ...data,
       ...(data.content === undefined ? {} : { contentText: htmlToText(data.content) }),
@@ -404,7 +421,12 @@ export async function shareNote(
   const recipient = await findUserByEmail(email);
 
   if (recipient === null) {
-    throw new HttpError(404, 'No account with that email');
+    // deliberately the same wording whichever of the two was wrong. it does not
+    // close the hole - the share list still shows who was added - but it stops
+    // the route being a plain yes/no oracle for whether an address has an
+    // account. the rate limit on it is what does the real work
+    logger.warn({ userId, noteId: id }, 'Share attempted for an unknown address');
+    throw new HttpError(404, 'That note could not be shared with that address');
   }
 
   if (recipient.id === userId) {
@@ -427,11 +449,7 @@ export async function shareNote(
 }
 
 /** Removes a share. The owner may take it back, and the reader may drop it. */
-export async function unshareNote(
-  userId: number,
-  id: number,
-  targetUserId: number,
-): Promise<void> {
+export async function unshareNote(userId: number, id: number, targetUserId: number): Promise<void> {
   // giving a note back does not need the owner's permission
   if (targetUserId !== userId) {
     await ownedOrThrow(userId, id);
@@ -477,6 +495,7 @@ export async function* eachNoteToExport(authorId: number): AsyncGenerator<Export
       yield {
         title: note.title,
         content: note.content,
+        pinned: note.pinned,
         createdAt: note.createdAt,
         updatedAt: note.updatedAt,
       };
@@ -499,6 +518,7 @@ export async function importNotes(authorId: number, input: unknown): Promise<num
       title: note.title,
       content: note.content,
       contentText: htmlToText(note.content),
+      pinned: note.pinned,
       authorId,
       // keeping the original dates makes a restore look like the notes never left
       ...(note.createdAt === undefined ? {} : { createdAt: note.createdAt }),

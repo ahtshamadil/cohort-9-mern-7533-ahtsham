@@ -4,23 +4,25 @@ import { env } from '../config/env.js';
 
 const ALGORITHM = 'HS256';
 
+/** What a valid token says: who it is for, which generation, and until when. */
+export interface Session {
+  userId: number;
+  tokenVersion: number;
+  /** When the token stops being valid, in milliseconds. */
+  expiresAt: number;
+}
+
 /** Signs a session token for a user. */
-export function signToken(userId: number): string {
-  return jwt.sign({}, env.jwtSecret, {
+export function signToken(userId: number, tokenVersion: number): string {
+  return jwt.sign({ ver: tokenVersion }, env.jwtSecret, {
     algorithm: ALGORITHM,
     subject: String(userId),
     expiresIn: env.jwtExpiresInSeconds,
   });
 }
 
-/** Who a token is for, and the moment it stops being valid. */
-export interface Session {
-  userId: number;
-  expiresAt: number;
-}
-
-/** Returns the session a valid token carries, or null if it is not valid. */
-export function verifySession(token: string): Session | null {
+/** Reads a valid token, or null if it is not one. */
+export function readToken(token: string): Session | null {
   try {
     const payload = jwt.verify(token, env.jwtSecret, { algorithms: [ALGORITHM] });
 
@@ -29,14 +31,14 @@ export function verifySession(token: string): Session | null {
     }
 
     const userId = Number(payload.sub);
+    const { ver } = payload as { ver?: unknown };
 
-    return Number.isInteger(userId) ? { userId, expiresAt: payload.exp * 1000 } : null;
+    if (!Number.isInteger(userId) || !Number.isInteger(ver)) {
+      return null;
+    }
+
+    return { userId, tokenVersion: ver as number, expiresAt: payload.exp * 1000 };
   } catch {
     return null;
   }
-}
-
-/** Returns the user id from a valid token, or null if it is not valid. */
-export function verifyToken(token: string): number | null {
-  return verifySession(token)?.userId ?? null;
 }

@@ -12,6 +12,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,
+        // the socket server sits under /api too, and an upgrade request is not
+        // proxied by the http rule on its own
+        ws: true,
       },
     },
   },

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { shareLimiter } from '../middleware/rateLimit.js';
 import { currentUserId, requireAuth } from '../middleware/requireAuth.js';
 import { noteDeleted, noteUpdated, shareGranted, shareRevoked } from '../realtime/socket.js';
 import { validateBody } from '../middleware/validate.js';
@@ -125,7 +126,7 @@ notesRouter.get('/:id/shares', async (req, res) => {
   res.json({ shares });
 });
 
-notesRouter.post('/:id/shares', validateBody(shareNoteSchema), async (req, res) => {
+notesRouter.post('/:id/shares', shareLimiter, validateBody(shareNoteSchema), async (req, res) => {
   const body: ShareNoteInput = req.body;
   const id = noteId(req.params.id);
   const { share, created } = await shareNote(currentUserId(req), id, body);

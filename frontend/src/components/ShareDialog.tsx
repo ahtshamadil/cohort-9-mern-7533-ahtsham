@@ -211,7 +211,9 @@ export function ShareDialog({ noteId, onClose }: Readonly<{ noteId: number; onCl
           </ul>
         )}
 
-        {shares === null && error === null && <p className="muted">Loading...</p>}
+        {shares === null && error === null && (
+          <p className="muted">Loading who this is shared with...</p>
+        )}
       </div>
     </div>
   );

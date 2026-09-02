@@ -1,3 +1,4 @@
+import { socketId } from '../realtime/socket';
 import { apiFetch, apiRequest } from './client';
 
 /** An account as another one sees it, on a note they own or were shared. */
@@ -18,6 +19,7 @@ export interface Note {
   id: number;
   title: string;
   content: string;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   owner: UserSummary;
@@ -47,13 +49,21 @@ export interface NoteInput {
   content: string;
 }
 
+/** What a patch may change. Pinning is the owner's, so it travels on its own. */
+export interface NoteChanges extends Partial<NoteInput> {
+  pinned?: boolean;
+}
+
 /** The orders GET /api/notes will sort by. */
 export type NoteSort = 'recent' | 'oldest' | 'title' | 'created';
 
-/** What the list route accepts. Both are optional. */
+/** What the list route accepts. All of it is optional. */
 export interface NoteQuery {
   q?: string;
   sort?: NoteSort;
+  /** 1-based. The API sends every match when neither this nor limit is asked for. */
+  page?: number;
+  limit?: number;
 }
 
 /** The API's own default, so it is left out of the URL rather than sent back to it. */
@@ -70,6 +80,13 @@ function listSearch(query: NoteQuery): string {
 
   if (query.sort !== undefined && query.sort !== defaultSort) {
     params.set('sort', query.sort);
+  }
+
+  // both are sent or neither is. the API turns paging on the moment it sees one
+  // of them, and a page without a size is a page of whatever the server picked
+  if (query.page !== undefined && query.limit !== undefined) {
+    params.set('page', String(query.page));
+    params.set('limit', String(query.limit));
   }
 
   const search = params.toString();
@@ -131,13 +148,24 @@ export async function createNote(input: NoteInput): Promise<Note> {
 }
 
 /** Changes the fields it is given and leaves the rest alone. */
-export async function updateNote(id: number, input: Partial<NoteInput>): Promise<Note> {
+export async function updateNote(id: number, input: NoteChanges): Promise<Note> {
+  const from = socketId();
+
   const { note } = await apiFetch<{ note: Note }>(`/api/notes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
+    // names the socket that saved, so the server leaves it out of the broadcast.
+    // the server only honours an id belonging to the account that saved, so a
+    // missing header costs an echo and a wrong one costs nothing
+    headers: from === undefined ? {} : { 'x-socket-id': from },
   });
 
   return note;
+}
+
+/** Pins a note to the top of the owner's list, or takes the pin off. */
+export function setPinned(id: number, pinned: boolean): Promise<Note> {
+  return updateNote(id, { pinned });
 }
 
 /** Removes a note for good. */

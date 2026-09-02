@@ -624,7 +624,8 @@ describe('notes', function () {
 
     it('leaves the formatting somebody actually typed alone', async () => {
       const agent = await signIn('ahtsham@example.com');
-      const rich = '<h3>Title</h3><p><strong>bold</strong> and <em>italic</em></p><ul><li>a</li></ul>';
+      const rich =
+        '<h3>Title</h3><p><strong>bold</strong> and <em>italic</em></p><ul><li>a</li></ul>';
 
       await createNote(agent, 'Note', rich);
 
@@ -772,7 +773,6 @@ describe('notes', function () {
       expect(response.body.total).to.equal(5);
     });
   });
-
 
   describe('without a session', () => {
     it('refuses every route', async () => {

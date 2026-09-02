@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { ApiError, byField } from '../api/client';
+import { ApiError, byField, maxPasswordLength } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 import { AuthLayout } from './AuthLayout';
 import { FormField } from './FormField';
@@ -95,6 +95,7 @@ export function RegisterPage() {
           error={fieldErrors.password}
           autoComplete="new-password"
           placeholder="At least 8 characters"
+          maxLength={maxPasswordLength}
         />
 
         <button type="submit" className="button" disabled={submitting}>

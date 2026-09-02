@@ -16,6 +16,10 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  // bumped when the password changes, and carried in every token. a token
+  // holding an older number stops verifying, which is what logs the other
+  // sessions out - a jwt cannot be withdrawn any other way
+  tokenVersion Int      @default(0)
   notes        Note[]
   sharedWithMe NoteShare[]
   createdAt    DateTime @default(now())
@@ -30,6 +34,9 @@ model Note {
   content     String @db.MediumText
   // the same content with the markup taken out, so search does not match tag names
   contentText String @db.MediumText
+  // the owner's pin. sorted on before anything else, so it needs an index
+  // alongside the column the list is actually ordered by
+  pinned      Boolean @default(false)
   author      User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId    Int
   shares      NoteShare[]
@@ -38,6 +45,7 @@ model Note {
   updatedAt DateTime @updatedAt
 
   @@index([authorId, updatedAt])
+  @@index([authorId, pinned, updatedAt])
 }
 
 // lowercase so the value in the column, the zod enum and the json are one string

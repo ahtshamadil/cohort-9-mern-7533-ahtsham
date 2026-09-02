@@ -80,6 +80,24 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return body as T;
 }
 
+/**
+ * A character cap for the password fields, set at the API's byte limit.
+ *
+ * The two are not the same thing. The API counts bytes, because that is what
+ * bcrypt reads, and one character can be four of them - 72 accented characters
+ * pass this and are still 144 bytes. It stops the obvious case only; anything
+ * past the byte limit is refused by the API and shown as a field error.
+ */
+export const maxPasswordLength = 72;
+
+/** Changes the signed-in account's password. Ends every other session. */
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return apiFetch<void>('/api/auth/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 /** Turns the API's list of field errors into a lookup the forms can index by name. */
 export function byField(fieldErrors: FieldError[]): Record<string, string> {
   const result: Record<string, string> = {};
