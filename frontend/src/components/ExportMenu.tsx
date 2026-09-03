@@ -20,10 +20,10 @@ const choices: { format: ExportFormat; label: string; hint: string }[] = [
 export function ExportMenu({
   disabled = false,
   onChoose,
-}: {
+}: Readonly<{
   disabled?: boolean;
   onChoose: (format: ExportFormat) => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);

@@ -32,7 +32,7 @@ export const notesRouter = Router();
 notesRouter.use(requireAuth);
 
 function wholeNumber(value: string | string[], what: string): number {
-  const id = typeof value === 'string' ? Number(value) : NaN;
+  const id = typeof value === 'string' ? Number(value) : Number.NaN;
 
   if (!Number.isInteger(id) || id < 1) {
     throw new HttpError(400, `${what} must be a positive whole number`);

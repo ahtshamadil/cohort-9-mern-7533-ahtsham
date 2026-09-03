@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { SyntheticEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { ApiError, byField, maxPasswordLength } from '../api/client';
@@ -20,7 +20,7 @@ export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   /** Creates the account, or shows whatever the API objected to. */
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setFormError(null);

@@ -17,6 +17,15 @@ module.exports = {
   // same value, a query that finds nothing trips this first and the failure
   // reads "exceeded timeout" instead of naming the element it looked for
   testTimeout: 15000,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text-summary', 'lcov'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/test/**',
+    '!src/main.tsx',
+    '!src/vite-env.d.ts',
+  ],
   // one worker per core leaves the suites fighting over the cpu, and a screen
   // waiting on a debounce loses that fight and trips asyncUtilTimeout. the
   // failures move between files from one run to the next, which is what makes

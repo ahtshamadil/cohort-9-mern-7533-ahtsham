@@ -24,6 +24,24 @@ export const testUser = {
   createdAt: '2026-08-11T00:00:00.000Z',
 };
 
+/** The url of whatever fetch was handed, which is not always a string. */
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') {
+    return input;
+  }
+
+  return input instanceof URL ? input.href : input.url;
+}
+
+/** The method fetch will actually use: init wins, then the Request's own. */
+function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+  if (init?.method !== undefined) {
+    return init.method;
+  }
+
+  return typeof input === 'string' || input instanceof URL ? 'GET' : input.method;
+}
+
 const originalFetch = globalThis.fetch;
 
 /**
@@ -35,7 +53,7 @@ const originalFetch = globalThis.fetch;
  */
 export function stubApi(routes: Record<string, StubbedResponse>): void {
   globalThis.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    const key = `${init?.method ?? 'GET'} ${String(input)}`;
+    const key = `${requestMethod(input, init)} ${requestUrl(input)}`;
     const match = routes[key];
 
     // failing loudly beats a confusing undefined further along - a missing stub

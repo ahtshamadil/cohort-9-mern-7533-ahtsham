@@ -15,4 +15,11 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
+  {
+    files: ['test/**/*.ts'],
+    rules: {
+      // chai asserts through properties - expect(x).to.be.null is the whole call
+      '@typescript-eslint/no-unused-expressions': 'off',
+    },
+  },
 );

@@ -1,0 +1,237 @@
+{
+  "total": 4,
+  "p": 1,
+  "ps": 100,
+  "paging": {
+    "pageIndex": 1,
+    "pageSize": 100,
+    "total": 4
+  },
+  "effortTotal": 20,
+  "issues": [
+    {
+      "key": "84ea1c7a-c97f-46c0-9fe4-7f5e638c280b",
+      "rule": "typescript:S6819",
+      "severity": "MAJOR",
+      "component": "slate-notes:frontend/src/components/ChangePasswordDialog.tsx",
+      "project": "slate-notes",
+      "line": 56,
+      "hash": "d90c26198ff23a5c54f81269ceed5c01",
+      "textRange": {
+        "startLine": 56,
+        "endLine": 62,
+        "startOffset": 6,
+        "endOffset": 7
+      },
+      "flows": [],
+      "status": "OPEN",
+      "message": "Use <dialog> instead of the \"dialog\" role to ensure accessibility across all devices.",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": [
+        "accessibility",
+        "react"
+      ],
+      "creationDate": "2026-09-01T10:33:14+0000",
+      "updateDate": "2026-09-01T14:58:14+0000",
+      "type": "CODE_SMELL",
+      "scope": "MAIN",
+      "quickFixAvailable": false,
+      "messageFormattings": [],
+      "codeVariants": [],
+      "cleanCodeAttribute": "CONVENTIONAL",
+      "cleanCodeAttributeCategory": "CONSISTENT",
+      "impacts": [
+        {
+          "softwareQuality": "MAINTAINABILITY",
+          "severity": "MEDIUM"
+        }
+      ],
+      "issueStatus": "OPEN",
+      "prioritizedRule": false,
+      "fromSonarQubeUpdate": false,
+      "internalTags": [],
+      "linkedTicketStatus": "NOT_LINKED"
+    },
+    {
+      "key": "daa966d4-dac7-47df-afc4-6a7ba6936f58",
+      "rule": "typescript:S6819",
+      "severity": "MAJOR",
+      "component": "slate-notes:frontend/src/components/ShareDialog.tsx",
+      "project": "slate-notes",
+      "line": 123,
+      "hash": "d90c26198ff23a5c54f81269ceed5c01",
+      "textRange": {
+        "startLine": 123,
+        "endLine": 129,
+        "startOffset": 6,
+        "endOffset": 7
+      },
+      "flows": [],
+      "status": "OPEN",
+      "message": "Use <dialog> instead of the \"dialog\" role to ensure accessibility across all devices.",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": [
+        "accessibility",
+        "react"
+      ],
+      "creationDate": "2026-08-26T16:22:41+0000",
+      "updateDate": "2026-09-01T14:58:14+0000",
+      "type": "CODE_SMELL",
+      "scope": "MAIN",
+      "quickFixAvailable": false,
+      "messageFormattings": [],
+      "codeVariants": [],
+      "cleanCodeAttribute": "CONVENTIONAL",
+      "cleanCodeAttributeCategory": "CONSISTENT",
+      "impacts": [
+        {
+          "softwareQuality": "MAINTAINABILITY",
+          "severity": "MEDIUM"
+        }
+      ],
+      "issueStatus": "OPEN",
+      "prioritizedRule": false,
+      "fromSonarQubeUpdate": false,
+      "internalTags": [],
+      "linkedTicketStatus": "NOT_LINKED"
+    },
+    {
+      "key": "3d0e5b0c-f2d9-4e92-97a2-0bd2876d4e01",
+      "rule": "typescript:S7756",
+      "severity": "MINOR",
+      "component": "slate-notes:frontend/src/api/notes.ts",
+      "project": "slate-notes",
+      "line": 279,
+      "hash": "698d8af3e94ca2492d4c4901d3463af2",
+      "textRange": {
+        "startLine": 279,
+        "endLine": 279,
+        "startOffset": 11,
+        "endOffset": 21
+      },
+      "flows": [],
+      "status": "OPEN",
+      "message": "Prefer `Blob#text()` over `FileReader#readAsText(blob)`.",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": [
+        "modernization",
+        "editable-source",
+        "promise",
+        "javascript"
+      ],
+      "creationDate": "2026-08-24T15:31:05+0000",
+      "updateDate": "2026-09-01T14:58:14+0000",
+      "type": "CODE_SMELL",
+      "scope": "MAIN",
+      "quickFixAvailable": false,
+      "messageFormattings": [],
+      "codeVariants": [],
+      "cleanCodeAttribute": "CLEAR",
+      "cleanCodeAttributeCategory": "INTENTIONAL",
+      "impacts": [
+        {
+          "softwareQuality": "MAINTAINABILITY",
+          "severity": "LOW"
+        }
+      ],
+      "issueStatus": "OPEN",
+      "prioritizedRule": false,
+      "fromSonarQubeUpdate": false,
+      "internalTags": [],
+      "linkedTicketStatus": "NOT_LINKED"
+    },
+    {
+      "key": "49c41ed3-0e61-4e6a-8a00-292e33d957ad",
+      "rule": "typescript:S7785",
+      "severity": "MAJOR",
+      "component": "slate-notes:backend/src/services/authService.ts",
+      "project": "slate-notes",
+      "line": 42,
+      "hash": "26b9286ca230c970ec58731267f08724",
+      "textRange": {
+        "startLine": 42,
+        "endLine": 42,
+        "startOffset": 10,
+        "endOffset": 15
+      },
+      "flows": [],
+      "status": "OPEN",
+      "message": "Prefer top-level await over using a promise chain.",
+      "effort": "5min",
+      "debt": "5min",
+      "tags": [
+        "async",
+        "editable-source",
+        "type-dependent",
+        "es2022",
+        "esm-only",
+        "modernize"
+      ],
+      "creationDate": "2026-08-13T07:05:15+0000",
+      "updateDate": "2026-09-01T14:58:14+0000",
+      "type": "CODE_SMELL",
+      "scope": "MAIN",
+      "quickFixAvailable": false,
+      "messageFormattings": [],
+      "codeVariants": [],
+      "cleanCodeAttribute": "CONVENTIONAL",
+      "cleanCodeAttributeCategory": "CONSISTENT",
+      "impacts": [
+        {
+          "softwareQuality": "MAINTAINABILITY",
+          "severity": "MEDIUM"
+        }
+      ],
+      "issueStatus": "OPEN",
+      "prioritizedRule": false,
+      "fromSonarQubeUpdate": false,
+      "internalTags": [],
+      "linkedTicketStatus": "NOT_LINKED"
+    }
+  ],
+  "components": [
+    {
+      "key": "slate-notes:backend/src/services/authService.ts",
+      "enabled": true,
+      "qualifier": "FIL",
+      "name": "authService.ts",
+      "longName": "backend/src/services/authService.ts",
+      "path": "backend/src/services/authService.ts"
+    },
+    {
+      "key": "slate-notes:frontend/src/api/notes.ts",
+      "enabled": true,
+      "qualifier": "FIL",
+      "name": "notes.ts",
+      "longName": "frontend/src/api/notes.ts",
+      "path": "frontend/src/api/notes.ts"
+    },
+    {
+      "key": "slate-notes",
+      "enabled": true,
+      "qualifier": "TRK",
+      "name": "Slate Notes App",
+      "longName": "Slate Notes App"
+    },
+    {
+      "key": "slate-notes:frontend/src/components/ChangePasswordDialog.tsx",
+      "enabled": true,
+      "qualifier": "FIL",
+      "name": "ChangePasswordDialog.tsx",
+      "longName": "frontend/src/components/ChangePasswordDialog.tsx",
+      "path": "frontend/src/components/ChangePasswordDialog.tsx"
+    },
+    {
+      "key": "slate-notes:frontend/src/components/ShareDialog.tsx",
+      "enabled": true,
+      "qualifier": "FIL",
+      "name": "ShareDialog.tsx",
+      "longName": "frontend/src/components/ShareDialog.tsx",
+      "path": "frontend/src/components/ShareDialog.tsx"
+    }
+  ],
+  "facets": []
+}

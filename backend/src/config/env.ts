@@ -11,7 +11,7 @@ function readNumber(name: string, fallback: number): number {
 
   const parsed = Number(raw);
   if (Number.isNaN(parsed)) {
-    throw new Error(`Environment variable ${name} must be a number, received "${raw}"`);
+    throw new TypeError(`Environment variable ${name} must be a number, received "${raw}"`);
   }
 
   return parsed;
